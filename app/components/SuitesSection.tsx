@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Maximize2, Users, Eye, CheckCircle2, ArrowRight, X, BedDouble, Info } from "lucide-react";
 
 interface SuitesSectionProps {
@@ -33,7 +34,7 @@ export const ROOMS_DATA: RoomItem[] = [
     occupancy: "Up to 2 Guests",
     view: "River & City View",
     price: 9499,
-    image: "https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop",
+    image: "/gallery/11.jpg",
     highlights: ["Plush King-Size Bed", "LED TV & High-Speed Wi-Fi", "Tea & Coffee Maker", "Electronic Lock & Mini Bar"],
     description: "Our Premier Rooms offer warm, tastefully furnished spaces with modern amenities including LED TV, Mini Bar, Tea & Coffee Maker, Air Conditioning / Centralised Heating, and Electronic Locks — ideal for leisure and corporate travellers alike.",
   },
@@ -46,7 +47,7 @@ export const ROOMS_DATA: RoomItem[] = [
     occupancy: "Up to 3 Guests",
     view: "Panoramic River View",
     price: 10799,
-    image: "https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1974&auto=format&fit=crop",
+    image: "/gallery/12.jpg",
     highlights: ["River-Facing Windows", "Spacious Lounge Seating", "Premium Herbal Toiletries", "24/7 In-Room Dining"],
     description: "Wake up to sweeping views of the historic Jhelum River from our Luxury Rooms. Featuring generous living space, bespoke Kashmiri woodwork, premium toiletries, and all modern conveniences for an unforgettable valley stay.",
   },
@@ -116,9 +117,11 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
               <div>
                 {/* Image Container */}
                 <div className="relative h-72 overflow-hidden">
-                  <img
+                  <Image
                     src={room.image}
                     alt={room.name}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 filter contrast-[1.02]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
@@ -143,6 +146,7 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
                     <span className="text-xs text-[#7a7771] font-light">From </span>
                     <span className="font-serif text-xl font-bold text-[#1c1b1a]">₹{room.price.toLocaleString("en-IN")}</span>
                     <span className="text-[10px] text-[#7a7771] font-light"> / night</span>
+                    <span className="block text-[9px] uppercase tracking-widest text-[#a88956] font-semibold leading-none">CPAI • Taxes Incl.</span>
                   </div>
                 </div>
 
@@ -218,7 +222,7 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
             ))}
           </div>
           <div className="px-6 py-3 border-t border-[#f0ece5] bg-[#faf9f6]">
-            <p className="text-[11px] text-[#7a7771] font-light">* All rates are inclusive of applicable taxes. Prices are subject to change during peak season. Contact us for group and corporate rates.</p>
+            <p className="text-[11px] text-[#7a7771] font-light">* Room rates are quoted on the <strong className="font-medium text-[#5a5854]">CPAI plan</strong> (Continental Plan — accommodation with breakfast) and are inclusive of applicable taxes. Lunch and dinner are charged separately at the buffet rates above. Prices are subject to change during peak season. Contact us for group and corporate rates.</p>
           </div>
         </div>
       </div>
@@ -235,9 +239,11 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
               <X className="w-5 h-5" />
             </button>
 
-            <img
+            <Image
               src={selectedModalRoom.image}
               alt={selectedModalRoom.name}
+              width={1620}
+              height={1080}
               className="w-full h-64 object-cover rounded-xl mb-6 border border-[#e5e0d8]"
             />
 
@@ -267,6 +273,9 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
                   <span className="text-xs text-[#7a7771]">Nightly Rate: </span>
                   <span className="font-serif text-2xl text-[#1c1b1a] font-bold">
                     ₹{selectedModalRoom.price.toLocaleString("en-IN")}
+                  </span>
+                  <span className="block text-[10px] text-[#7a7771] font-light mt-0.5">
+                    On CPAI (room with breakfast), inclusive of applicable taxes.
                   </span>
                 </div>
 

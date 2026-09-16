@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin, Phone, Mail, Award, Sparkles, Send } from "lucide-react";
+import Link from "next/link";
+import { MapPin, Phone, Mail, Award, Send } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -136,11 +137,11 @@ export default function Footer() {
           <div>
             © {new Date().getFullYear()} Samci Riviera Palace & Resort. All rights reserved.
           </div>
-          <div className="flex space-x-6">
-            <a href="#" className="hover:text-[#e6d7c3] transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-[#e6d7c3] transition-colors">Terms of Luxury Service</a>
-            <a href="#" className="hover:text-[#e6d7c3] transition-colors">Accessibility</a>
-            <a href="#" className="hover:text-[#e6d7c3] transition-colors">Sitemap</a>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <Link href="/privacy" className="hover:text-[#e6d7c3] transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#e6d7c3] transition-colors">Terms of Service</Link>
+            <Link href="/accessibility" className="hover:text-[#e6d7c3] transition-colors">Accessibility</Link>
+            <a href="/sitemap.xml" className="hover:text-[#e6d7c3] transition-colors">Sitemap</a>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { SITE } from "./lib/site";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -14,9 +15,50 @@ const plusJakarta = Plus_Jakarta_Sans({
   weight: ["300", "400", "500", "600", "700"],
 });
 
+const TITLE = `${SITE.name} | ${SITE.tagline}`;
+const DESCRIPTION =
+  "Experience warm hospitality, refined deluxe rooms, authentic Kashmiri dining, and peaceful valley charm at Hotel Samci Riviera, Srinagar.";
+
 export const metadata: Metadata = {
-  title: "Hotel Samci Riviera | Luxury Hotel & Dining • Srinagar",
-  description: "Experience warm hospitality, refined deluxe rooms, authentic Kashmiri dining, and peaceful valley charm at Hotel Samci Riviera, Srinagar.",
+  metadataBase: new URL(SITE.url),
+  title: {
+    default: TITLE,
+    template: `%s | ${SITE.name}`,
+  },
+  description: DESCRIPTION,
+  applicationName: SITE.name,
+  keywords: [
+    "Hotel Samci Riviera",
+    "hotels in Srinagar",
+    "Srinagar hotel near Dal Lake",
+    "Kashmir hotel booking",
+    "Jhelum river hotel",
+    "conference hotel Srinagar",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    siteName: SITE.name,
+    title: TITLE,
+    description: DESCRIPTION,
+    url: SITE.url,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#141312",
 };
 
 export default function RootLayout({

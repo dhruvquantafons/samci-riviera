@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Sparkles, MapPin, BedDouble, Utensils, Building2, ArrowUpRight } from "lucide-react";
 
 export default function WelcomeSection() {
@@ -33,9 +34,11 @@ export default function WelcomeSection() {
           {/* Left Visual Column */}
           <div className="lg:col-span-6 relative">
             <div className="relative rounded-xl overflow-hidden border border-[#e5e0d8] shadow-xl group">
-              <img
-                src="https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1974&auto=format&fit=crop"
-                alt="Samci Riviera Palace Exterior"
+              <Image
+                src="/gallery/1.jpg"
+                width={1560}
+                height={1080}
+                alt="Hotel Samci Riviera building exterior and reception entrance in Srinagar"
                 className="w-full h-[520px] object-cover filter contrast-[1.03] group-hover:scale-105 transition-transform duration-700"
               />
 
@@ -59,9 +62,11 @@ export default function WelcomeSection() {
 
             {/* Secondary Accent Image Overlay */}
             <div className="hidden sm:block absolute -bottom-8 -right-8 w-56 h-56 rounded-xl overflow-hidden border-4 border-white shadow-2xl">
-              <img
-                src="https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1780&auto=format&fit=crop"
-                alt="Palace Courtyard"
+              <Image
+                src="/gallery/8.jpg"
+                fill
+                sizes="224px"
+                alt="Reception lobby and front desk at Hotel Samci Riviera"
                 className="w-full h-full object-cover"
               />
             </div>
