@@ -3,70 +3,28 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Maximize2, Users, Eye, CheckCircle2, ArrowRight, X, BedDouble, Info } from "lucide-react";
+import type { RoomType, ExtraCharge } from "../lib/types";
 
 interface SuitesSectionProps {
   onOpenBooking: (roomName?: string) => void;
+  rooms: RoomType[];
+  charges: ExtraCharge[];
 }
 
-export interface RoomItem {
-  id: string;
-  name: string;
-  category: "premier" | "luxury";
-  tagline: string;
-  size: string;
-  occupancy: string;
-  view: string;
-  price: number;
-  image: string;
-  highlights: string[];
-  description: string;
-}
+export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesSectionProps) {
+  const [activeTab, setActiveTab] = useState<string>("all");
+  const [selectedModalRoom, setSelectedModalRoom] = useState<RoomType | null>(null);
 
-export type SuiteItem = RoomItem;
+  const filteredRooms = activeTab === "all" ? rooms : rooms.filter((r) => r.category === activeTab);
 
-export const ROOMS_DATA: RoomItem[] = [
-  {
-    id: "premier-room",
-    name: "Premier Room",
-    category: "premier",
-    tagline: "Comfortable Kashmiri Elegance for the Discerning Traveller",
-    size: "300–350 sq. ft.",
-    occupancy: "Up to 2 Guests",
-    view: "River & City View",
-    price: 9499,
-    image: "/gallery/11.jpg",
-    highlights: ["Plush King-Size Bed", "LED TV & High-Speed Wi-Fi", "Tea & Coffee Maker", "Electronic Lock & Mini Bar"],
-    description: "Our Premier Rooms offer warm, tastefully furnished spaces with modern amenities including LED TV, Mini Bar, Tea & Coffee Maker, Air Conditioning / Centralised Heating, and Electronic Locks — ideal for leisure and corporate travellers alike.",
-  },
-  {
-    id: "luxury-room",
-    name: "Luxury Room",
-    category: "luxury",
-    tagline: "Elevated Comfort with Panoramic Jhelum River Views",
-    size: "400–550 sq. ft.",
-    occupancy: "Up to 3 Guests",
-    view: "Panoramic River View",
-    price: 10799,
-    image: "/gallery/12.jpg",
-    highlights: ["River-Facing Windows", "Spacious Lounge Seating", "Premium Herbal Toiletries", "24/7 In-Room Dining"],
-    description: "Wake up to sweeping views of the historic Jhelum River from our Luxury Rooms. Featuring generous living space, bespoke Kashmiri woodwork, premium toiletries, and all modern conveniences for an unforgettable valley stay.",
-  },
-];
-
-export const SUITES_DATA = ROOMS_DATA;
-
-const EXTRA_CHARGES = [
-  { label: "Extra Occupant (Above 10 Years)", amount: 2200 },
-  { label: "Child Without Bed", amount: 1500 },
-  { label: "Buffet Lunch / Dinner (per person)", amount: 1470 },
-  { label: "Meal – Child (Age 5–10 Years)", amount: 750 },
-];
-
-export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
-  const [activeTab, setActiveTab] = useState<"all" | "premier" | "luxury">("all");
-  const [selectedModalRoom, setSelectedModalRoom] = useState<RoomItem | null>(null);
-
-  const filteredRooms = activeTab === "all" ? ROOMS_DATA : ROOMS_DATA.filter((r) => r.category === activeTab);
+  // Tabs follow whatever room types an administrator has published.
+  const tabs = [
+    { id: "all", label: "All Rooms" },
+    ...Array.from(new Set(rooms.map((r) => r.category))).map((category) => ({
+      id: category,
+      label: `${category.charAt(0).toUpperCase()}${category.slice(1)} Rooms`,
+    })),
+  ];
 
   return (
     <section id="rooms" className="py-24 bg-[#f5f3ef] text-[#1c1b1a] relative">
@@ -88,14 +46,10 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
 
         {/* Tab Filters */}
         <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-12 flex-wrap gap-y-2">
-          {[
-            { id: "all", label: "All Rooms" },
-            { id: "premier", label: "Premier Rooms" },
-            { id: "luxury", label: "Luxury Rooms" },
-          ].map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`px-5 py-2 text-xs uppercase tracking-widest font-medium rounded-full transition-all duration-300 cursor-pointer ${
                 activeTab === tab.id
                   ? "bg-[#e6d7c3] text-[#1c1b1a] shadow-sm font-semibold"
@@ -144,7 +98,7 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
                   {/* Price Tag */}
                   <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-lg border border-[#e5e0d8] shadow-sm">
                     <span className="text-xs text-[#7a7771] font-light">From </span>
-                    <span className="font-serif text-xl font-bold text-[#1c1b1a]">₹{room.price.toLocaleString("en-IN")}</span>
+                    <span className="font-serif text-xl font-bold text-[#1c1b1a]">₹{Number(room.base_rate).toLocaleString("en-IN")}</span>
                     <span className="text-[10px] text-[#7a7771] font-light"> / night</span>
                     <span className="block text-[9px] uppercase tracking-widest text-[#a88956] font-semibold leading-none">CPAI • Taxes Incl.</span>
                   </div>
@@ -214,10 +168,10 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
             <span className="ml-auto text-[10px] uppercase tracking-widest text-[#7a7771] font-medium">Per Person / Per Night</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[#f0ece5]">
-            {EXTRA_CHARGES.map((item, i) => (
-              <div key={i} className="flex items-center justify-between px-6 py-4 even:bg-[#faf9f6]">
+            {charges.map((item) => (
+              <div key={item.id} className="flex items-center justify-between px-6 py-4 even:bg-[#faf9f6]">
                 <span className="text-sm text-[#5a5854] font-light">{item.label}</span>
-                <span className="font-serif text-base font-semibold text-[#1c1b1a] ml-4 whitespace-nowrap">₹{item.amount.toLocaleString("en-IN")}</span>
+                <span className="font-serif text-base font-semibold text-[#1c1b1a] ml-4 whitespace-nowrap">₹{Number(item.amount).toLocaleString("en-IN")}</span>
               </div>
             ))}
           </div>
@@ -272,7 +226,7 @@ export default function SuitesSection({ onOpenBooking }: SuitesSectionProps) {
                 <div>
                   <span className="text-xs text-[#7a7771]">Nightly Rate: </span>
                   <span className="font-serif text-2xl text-[#1c1b1a] font-bold">
-                    ₹{selectedModalRoom.price.toLocaleString("en-IN")}
+                    ₹{Number(selectedModalRoom.base_rate).toLocaleString("en-IN")}
                   </span>
                   <span className="block text-[10px] text-[#7a7771] font-light mt-0.5">
                     On CPAI (room with breakfast), inclusive of applicable taxes.

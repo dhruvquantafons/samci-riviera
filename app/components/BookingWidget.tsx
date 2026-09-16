@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useActionState } from "react";
 import {
   X,
   Calendar,
@@ -12,11 +12,19 @@ import {
   Phone,
   Sparkles,
   Building2,
+  CheckCircle2,
+  Send,
 } from "lucide-react";
+import type { RoomType } from "../lib/types";
+import { submitBookingRequest, type RequestState } from "../lib/booking-request";
 
 interface BookingWidgetProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Room types offered in the picker, driven by the admin panel. */
+  roomTypes: RoomType[];
+  /** Pre-selects a room when the guest arrived from a specific room card. */
+  preselectedRoom?: string;
 }
 
 const SPECIAL_CODES = [
@@ -34,7 +42,12 @@ const fmtDate = (iso: string) => {
 
 const toIso = (d: Date) => d.toISOString().split("T")[0];
 
-export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
+export default function BookingWidget({
+  isOpen,
+  onClose,
+  roomTypes,
+  preselectedRoom = "",
+}: BookingWidgetProps) {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
@@ -45,6 +58,14 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
   const [children, setChildren] = useState(0);
   const [rooms, setRooms] = useState(1);
   const [specialCode, setSpecialCode] = useState("");
+  const [roomTypeId, setRoomTypeId] = useState(
+    () => roomTypes.find((rt) => rt.name === preselectedRoom)?.id ?? roomTypes[0]?.id ?? "",
+  );
+
+  const [state, formAction, pending] = useActionState<RequestState, FormData>(
+    submitBookingRequest,
+    {},
+  );
 
   const [guestOpen, setGuestOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
@@ -164,7 +185,26 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        {state.success ? (
+          <div className="p-8 flex flex-col items-center text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <h4 className="font-serif text-xl text-[#1c1b1a] font-medium">Request received</h4>
+            <p className="text-xs text-[#7a7771] leading-relaxed max-w-xs">{state.success}</p>
+            <a
+              href="tel:+919070090713"
+              className="inline-flex items-center gap-2 text-xs text-[#a88956] hover:text-[#8f7343] transition-colors pt-2"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span>Or call us now on +91 90700 90713</span>
+            </a>
+            <button type="button" onClick={onClose} className="text-[11px] text-[#9a9490] underline pt-1 cursor-pointer">
+              Close
+            </button>
+          </div>
+        ) : (
+        <form action={formAction} className="p-6 space-y-4">
           {/* Tagline / direct booking benefit */}
           <div className="bg-[#faf8f5] border border-[#eee8df] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-[#5a5854]">
             <span className="flex items-center gap-1.5 font-medium text-[#1c1b1a]">
@@ -345,7 +385,109 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
             </div>
           </div>
 
-          {/* ── Reservations are taken by phone ── */}
+          {/* Values chosen in the pickers above */}
+          <input type="hidden" name="check_in" value={checkIn} />
+          <input type="hidden" name="check_out" value={checkOut} />
+          <input type="hidden" name="adults" value={adults} />
+          <input type="hidden" name="children" value={children} />
+          <input type="hidden" name="rooms_count" value={rooms} />
+          <input type="hidden" name="promo_code" value={specialCode} />
+
+          {/* ── Room & contact details ── */}
+          <div className="space-y-3 pt-1">
+            {roomTypes.length > 0 && (
+              <label className="block">
+                <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold mb-1">
+                  Room
+                </span>
+                <select
+                  name="room_type_id"
+                  value={roomTypeId}
+                  onChange={(e) => setRoomTypeId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#ede9e2] rounded-xl text-[#1c1b1a] focus:outline-none focus:border-[#a88956]"
+                >
+                  {roomTypes.map((rt) => (
+                    <option key={rt.id} value={rt.id}>
+                      {rt.name} — ₹{Number(rt.base_rate).toLocaleString("en-IN")} / night
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold mb-1">
+                  Your name
+                </span>
+                <input
+                  name="contact_name"
+                  required
+                  autoComplete="name"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#ede9e2] rounded-xl text-[#1c1b1a] focus:outline-none focus:border-[#a88956]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold mb-1">
+                  Phone
+                </span>
+                <input
+                  name="contact_phone"
+                  type="tel"
+                  autoComplete="tel"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#ede9e2] rounded-xl text-[#1c1b1a] focus:outline-none focus:border-[#a88956]"
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold mb-1">
+                Email
+              </span>
+              <input
+                name="contact_email"
+                type="email"
+                autoComplete="email"
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#ede9e2] rounded-xl text-[#1c1b1a] focus:outline-none focus:border-[#a88956]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold mb-1">
+                Anything we should know?
+              </span>
+              <textarea
+                name="special_requests"
+                rows={2}
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#ede9e2] rounded-xl text-[#1c1b1a] focus:outline-none focus:border-[#a88956]"
+              />
+            </label>
+          </div>
+
+          {state.error && (
+            <p role="alert" className="text-xs bg-rose-50 text-rose-800 border border-rose-200 rounded-lg px-3 py-2">
+              {state.error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={pending}
+            className="w-full py-3.5 bg-[#1c1b1a] hover:bg-black text-white rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-60"
+          >
+            <Send className="w-4 h-4 shrink-0" />
+            <span className="font-bold text-xs uppercase tracking-[0.2em]">
+              {pending ? "Sending…" : "Send booking request"}
+            </span>
+          </button>
+
+          <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-[#c9c4bc]">
+            <span className="h-px flex-1 bg-[#ede9e2]" />
+            <span>or</span>
+            <span className="h-px flex-1 bg-[#ede9e2]" />
+          </div>
+
+          {/* ── Reservations are also taken by phone ── */}
           <a
             href="tel:+919070090713"
             className="w-full py-4 bg-[#a88956] hover:bg-[#8f7343] text-white rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2.5"
@@ -357,7 +499,8 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
           <p className="text-center text-[11px] text-[#7a7771] font-light leading-relaxed px-2">
             Call the front desk with your dates and we will check availability and confirm your booking.
           </p>
-        </div>
+        </form>
+        )}
       </div>
     </div>
   );

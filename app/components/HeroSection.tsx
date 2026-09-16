@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, Users, ChevronRight, Play, Volume2, VolumeX, Sparkles, MapPin, Award } from "lucide-react";
+import type { RoomType } from "../lib/types";
 
 interface HeroSectionProps {
-  onOpenBooking: (params?: { checkIn?: string; checkOut?: string; guests?: number; suite?: string }) => void;
+  onOpenBooking: (roomName?: string) => void;
+  rooms: RoomType[];
 }
 
 const HERO_SLIDES = [
@@ -31,16 +33,18 @@ const HERO_SLIDES = [
   },
 ];
 
-export default function HeroSection({ onOpenBooking }: HeroSectionProps) {
+export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
 
   // Quick reservation state
-  const [checkIn, setCheckIn] = useState("2026-10-15");
-  const [checkOut, setCheckOut] = useState("2026-10-18");
+  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().split("T")[0]);
+  const [checkOut, setCheckOut] = useState(
+    () => new Date(Date.now() + 86400000).toISOString().split("T")[0],
+  );
   const [guests, setGuests] = useState(2);
-  const [roomType, setRoomType] = useState("Executive Deluxe Room");
+  const [roomType, setRoomType] = useState(rooms[0]?.name ?? "");
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -52,7 +56,7 @@ export default function HeroSection({ onOpenBooking }: HeroSectionProps) {
 
   const handleQuickBook = (e: React.FormEvent) => {
     e.preventDefault();
-    onOpenBooking({ checkIn, checkOut, guests, suite: roomType });
+    onOpenBooking(roomType);
   };
 
   return (
@@ -215,10 +219,11 @@ export default function HeroSection({ onOpenBooking }: HeroSectionProps) {
               onChange={(e) => setRoomType(e.target.value)}
               className="bg-[#2a2927] border border-white/10 text-xs text-white rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#d9c3a3] w-full truncate"
             >
-              <option value="Executive Deluxe Room">Executive Deluxe Room</option>
-              <option value="Super Deluxe Room">Super Deluxe Room</option>
-              <option value="Premium Family Room">Premium Family Room</option>
-              <option value="Classic Deluxe Room">Classic Deluxe Room</option>
+              {rooms.map((room) => (
+                <option key={room.id} value={room.name}>
+                  {room.name}
+                </option>
+              ))}
             </select>
           </div>
 

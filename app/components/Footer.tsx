@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { MapPin, Phone, Mail, Award, Send } from "lucide-react";
+import type { RoomType } from "../lib/types";
 
-export default function Footer() {
+export default function Footer({ rooms }: { rooms: RoomType[] }) {
   return (
     <footer className="bg-[#141312] border-t border-white/10 text-slate-400 font-sans relative overflow-hidden">
       {/* Top Awards Bar */}
@@ -80,8 +81,13 @@ export default function Footer() {
               Our Rooms
             </h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#rooms" className="hover:text-[#e6d7c3] transition-colors">Premier Rooms – ₹9,499/night</a></li>
-              <li><a href="#rooms" className="hover:text-[#e6d7c3] transition-colors">Luxury Rooms – ₹10,799/night</a></li>
+              {rooms.map((room) => (
+                <li key={room.id}>
+                  <a href="#rooms" className="hover:text-[#e6d7c3] transition-colors">
+                    {room.name} – ₹{Number(room.base_rate).toLocaleString("en-IN")}/night
+                  </a>
+                </li>
+              ))}
               <li><a href="#rooms" className="hover:text-[#e6d7c3] transition-colors">All Accommodations</a></li>
             </ul>
           </div>
