@@ -44,11 +44,10 @@ export default function Home() {
       {/* Luxury Footer */}
       <Footer />
 
-      {/* Taj-Style Booking Widget */}
-      <BookingWidget
-        isOpen={bookingOpen}
-        onClose={() => setBookingOpen(false)}
-      />
+      {/* Reservation panel — mounted only while open so its state resets on close */}
+      {bookingOpen && (
+        <BookingWidget isOpen onClose={() => setBookingOpen(false)} />
+      )}
     </main>
   );
 }

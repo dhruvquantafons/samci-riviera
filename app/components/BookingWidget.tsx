@@ -7,12 +7,10 @@ import {
   Users,
   Tag,
   ChevronDown,
-  Search,
   Minus,
   Plus,
   Phone,
   Sparkles,
-  CheckCircle2,
   Building2,
 } from "lucide-react";
 
@@ -51,7 +49,6 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
   const [guestOpen, setGuestOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   const widgetRef = useRef<HTMLDivElement>(null);
 
@@ -75,16 +72,6 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Reset state on close
-  useEffect(() => {
-    if (!isOpen) {
-      setSubmitted(false);
-      setGuestOpen(false);
-      setCodeOpen(false);
-      setDateOpen(false);
-    }
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   const nights = Math.max(
@@ -100,14 +87,6 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
   } \u2013 ${rooms} Room${rooms !== 1 ? "s" : ""}`;
 
   const selectedCodeLabel = SPECIAL_CODES.find((c) => c.value === specialCode)?.label ?? "Standard Direct Rate";
-
-  const handleCheckRates = () => {
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      onClose();
-    }, 3500);
-  };
 
   const renderCounter = (
     label: string,
@@ -185,226 +164,200 @@ export default function BookingWidget({ isOpen, onClose }: BookingWidgetProps) {
           </button>
         </div>
 
-        {!submitted ? (
-          <div className="p-6 space-y-4">
-            {/* Tagline / direct booking benefit */}
-            <div className="bg-[#faf8f5] border border-[#eee8df] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-[#5a5854]">
-              <span className="flex items-center gap-1.5 font-medium text-[#1c1b1a]">
-                <Sparkles className="w-3.5 h-3.5 text-[#a88956]" /> Direct Direct Reservation
-              </span>
-              <span className="text-[#a88956] font-semibold text-[11px]">Best Rate Guaranteed</span>
-            </div>
+        <div className="p-6 space-y-4">
+          {/* Tagline / direct booking benefit */}
+          <div className="bg-[#faf8f5] border border-[#eee8df] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-[#5a5854]">
+            <span className="flex items-center gap-1.5 font-medium text-[#1c1b1a]">
+              <Sparkles className="w-3.5 h-3.5 text-[#a88956]" /> Direct Reservation
+            </span>
+            <span className="text-[#a88956] font-semibold text-[11px]">Best Rate Guaranteed</span>
+          </div>
 
-            {/* Form Fields Stack */}
-            <div className="border border-[#ede9e2] rounded-xl overflow-hidden divide-y divide-[#ede9e2] bg-white shadow-sm">
-              {/* ── Field 1: Check-In & Check-Out Dates ── */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDateOpen(!dateOpen);
-                    setGuestOpen(false);
-                    setCodeOpen(false);
-                  }}
-                  className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
-                >
-                  <Calendar className="w-4 h-4 text-[#a88956] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
-                      Dates of Stay ({nights} Night{nights !== 1 ? "s" : ""})
-                    </p>
-                    <p className="text-sm font-medium text-[#1c1b1a] mt-0.5">
-                      {fmtDate(checkIn)} &nbsp;<span className="text-[#a88956]">—</span>&nbsp; {fmtDate(checkOut)}
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-[#9a9490] group-hover:text-[#a88956] transition-transform ${
-                      dateOpen ? "rotate-180 text-[#a88956]" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Date Selection Popover */}
-                {dateOpen && (
-                  <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-[#7a7771] font-semibold block mb-1">
-                          Check-In Date
-                        </label>
-                        <input
-                          type="date"
-                          value={checkIn}
-                          min={toIso(today)}
-                          onChange={(e) => {
-                            setCheckIn(e.target.value);
-                            if (e.target.value >= checkOut) {
-                              const d = new Date(e.target.value + "T00:00:00");
-                              d.setDate(d.getDate() + 1);
-                              setCheckOut(toIso(d));
-                            }
-                          }}
-                          className="w-full text-xs font-medium text-[#1c1b1a] bg-white border border-[#e5e0d8] rounded-lg px-3 py-2 focus:outline-none focus:border-[#a88956]"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-[#7a7771] font-semibold block mb-1">
-                          Check-Out Date
-                        </label>
-                        <input
-                          type="date"
-                          value={checkOut}
-                          min={checkIn}
-                          onChange={(e) => setCheckOut(e.target.value)}
-                          className="w-full text-xs font-medium text-[#1c1b1a] bg-white border border-[#e5e0d8] rounded-lg px-3 py-2 focus:outline-none focus:border-[#a88956]"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDateOpen(false)}
-                      className="mt-3 w-full py-1.5 text-center text-xs font-semibold text-[#a88956] hover:text-[#1c1b1a] transition-colors"
-                    >
-                      Done Selecting Dates
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Field 2: Guests & Rooms Counter ── */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGuestOpen(!guestOpen);
-                    setDateOpen(false);
-                    setCodeOpen(false);
-                  }}
-                  className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
-                >
-                  <Users className="w-4 h-4 text-[#a88956] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
-                      Guests & Accommodations
-                    </p>
-                    <p className="text-sm font-medium text-[#1c1b1a] mt-0.5 truncate">
-                      {guestSummary}
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-[#9a9490] group-hover:text-[#a88956] transition-transform ${
-                      guestOpen ? "rotate-180 text-[#a88956]" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Guests Counter Popover */}
-                {guestOpen && (
-                  <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
-                    {renderCounter("Adults", "Age 11+ years", adults, 1, 6, setAdults)}
-                    {renderCounter("Children", "Age 5–10 years", children, 0, 4, setChildren)}
-                    {renderCounter("Rooms", "Number of rooms required", rooms, 1, 5, setRooms)}
-                    <button
-                      type="button"
-                      onClick={() => setGuestOpen(false)}
-                      className="mt-3 w-full py-2 bg-[#a88956] hover:bg-[#8f7343] text-white text-xs uppercase tracking-widest font-bold rounded-lg transition-colors cursor-pointer"
-                    >
-                      Confirm Guest Count
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Field 3: Special Offer Code ── */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCodeOpen(!codeOpen);
-                    setGuestOpen(false);
-                    setDateOpen(false);
-                  }}
-                  className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
-                >
-                  <Tag className="w-4 h-4 text-[#a88956] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
-                      Special Promo / Code
-                    </p>
-                    <p className={`text-sm font-medium mt-0.5 ${specialCode ? "text-[#a88956]" : "text-[#1c1b1a]"}`}>
-                      {selectedCodeLabel}
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-[#9a9490] group-hover:text-[#a88956] transition-transform ${
-                      codeOpen ? "rotate-180 text-[#a88956]" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Promo Code Selection */}
-                {codeOpen && (
-                  <div className="bg-[#faf8f5] border-t border-[#ede9e2] divide-y divide-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
-                    {SPECIAL_CODES.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setSpecialCode(opt.value);
-                          setCodeOpen(false);
-                        }}
-                        className={`w-full text-left px-5 py-3 text-xs transition-colors cursor-pointer ${
-                          specialCode === opt.value
-                            ? "bg-[#fdf6ec] text-[#a88956] font-semibold"
-                            : "text-[#1c1b1a] hover:bg-white"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── Action CTA Button ── */}
-            <button
-              type="button"
-              onClick={handleCheckRates}
-              className="w-full py-4 bg-[#a88956] hover:bg-[#8f7343] text-white font-bold text-xs uppercase tracking-[0.25em] rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
-            >
-              <span>CHECK RATES & AVAILABILITY</span>
-            </button>
-
-            {/* Direct Phone Support */}
-            <div className="pt-2 text-center border-t border-[#ede9e2]">
-              <a
-                href="tel:+919070090713"
-                className="inline-flex items-center gap-2 text-xs text-[#7a7771] hover:text-[#a88956] transition-colors"
+          {/* Form Fields Stack */}
+          <div className="border border-[#ede9e2] rounded-xl overflow-hidden divide-y divide-[#ede9e2] bg-white shadow-sm">
+            {/* ── Field 1: Check-In & Check-Out Dates ── */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setDateOpen(!dateOpen);
+                  setGuestOpen(false);
+                  setCodeOpen(false);
+                }}
+                className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
               >
-                <Phone className="w-3.5 h-3.5 text-[#a88956]" />
-                <span>Concierge Desk:&nbsp;<strong className="text-[#1c1b1a] font-medium">+91 90700 90713</strong></span>
-              </a>
+                <Calendar className="w-4 h-4 text-[#a88956] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
+                    Dates of Stay ({nights} Night{nights !== 1 ? "s" : ""})
+                  </p>
+                  <p className="text-sm font-medium text-[#1c1b1a] mt-0.5">
+                    {fmtDate(checkIn)} &nbsp;<span className="text-[#a88956]">—</span>&nbsp; {fmtDate(checkOut)}
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-[#9a9490] group-hover:text-[#a88956] transition-transform ${
+                    dateOpen ? "rotate-180 text-[#a88956]" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Date Selection Popover */}
+              {dateOpen && (
+                <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-[#7a7771] font-semibold block mb-1">
+                        Check-In Date
+                      </label>
+                      <input
+                        type="date"
+                        value={checkIn}
+                        min={toIso(today)}
+                        onChange={(e) => {
+                          setCheckIn(e.target.value);
+                          if (e.target.value >= checkOut) {
+                            const d = new Date(e.target.value + "T00:00:00");
+                            d.setDate(d.getDate() + 1);
+                            setCheckOut(toIso(d));
+                          }
+                        }}
+                        className="w-full text-xs font-medium text-[#1c1b1a] bg-white border border-[#e5e0d8] rounded-lg px-3 py-2 focus:outline-none focus:border-[#a88956]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-[#7a7771] font-semibold block mb-1">
+                        Check-Out Date
+                      </label>
+                      <input
+                        type="date"
+                        value={checkOut}
+                        min={checkIn}
+                        onChange={(e) => setCheckOut(e.target.value)}
+                        className="w-full text-xs font-medium text-[#1c1b1a] bg-white border border-[#e5e0d8] rounded-lg px-3 py-2 focus:outline-none focus:border-[#a88956]"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDateOpen(false)}
+                    className="mt-3 w-full py-1.5 text-center text-xs font-semibold text-[#a88956] hover:text-[#1c1b1a] transition-colors"
+                  >
+                    Done Selecting Dates
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Field 2: Guests & Rooms Counter ── */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setGuestOpen(!guestOpen);
+                  setDateOpen(false);
+                  setCodeOpen(false);
+                }}
+                className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
+              >
+                <Users className="w-4 h-4 text-[#a88956] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
+                    Guests & Accommodations
+                  </p>
+                  <p className="text-sm font-medium text-[#1c1b1a] mt-0.5 truncate">
+                    {guestSummary}
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-[#9a9490] group-hover:text-[#a88956] transition-transform ${
+                    guestOpen ? "rotate-180 text-[#a88956]" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Guests Counter Popover */}
+              {guestOpen && (
+                <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
+                  {renderCounter("Adults", "Age 11+ years", adults, 1, 6, setAdults)}
+                  {renderCounter("Children", "Age 5–10 years", children, 0, 4, setChildren)}
+                  {renderCounter("Rooms", "Number of rooms required", rooms, 1, 5, setRooms)}
+                  <button
+                    type="button"
+                    onClick={() => setGuestOpen(false)}
+                    className="mt-3 w-full py-2 bg-[#a88956] hover:bg-[#8f7343] text-white text-xs uppercase tracking-widest font-bold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Confirm Guest Count
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Field 3: Special Offer Code ── */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setCodeOpen(!codeOpen);
+                  setGuestOpen(false);
+                  setDateOpen(false);
+                }}
+                className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
+              >
+                <Tag className="w-4 h-4 text-[#a88956] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
+                    Special Promo / Code
+                  </p>
+                  <p className={`text-sm font-medium mt-0.5 ${specialCode ? "text-[#a88956]" : "text-[#1c1b1a]"}`}>
+                    {selectedCodeLabel}
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-[#9a9490] group-hover:text-[#a88956] transition-transform ${
+                    codeOpen ? "rotate-180 text-[#a88956]" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Promo Code Selection */}
+              {codeOpen && (
+                <div className="bg-[#faf8f5] border-t border-[#ede9e2] divide-y divide-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
+                  {SPECIAL_CODES.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setSpecialCode(opt.value);
+                        setCodeOpen(false);
+                      }}
+                      className={`w-full text-left px-5 py-3 text-xs transition-colors cursor-pointer ${
+                        specialCode === opt.value
+                          ? "bg-[#fdf6ec] text-[#a88956] font-semibold"
+                          : "text-[#1c1b1a] hover:bg-white"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        ) : (
-          /* ── Confirmation / Search Screen ── */
-          <div className="p-10 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in duration-300">
-            <div className="w-16 h-16 rounded-full bg-[#a88956]/15 text-[#a88956] flex items-center justify-center border border-[#a88956]/30">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-            <h4 className="font-serif text-2xl text-[#1c1b1a] font-medium">Checking Room Availability…</h4>
-            <p className="text-xs text-[#7a7771] max-w-xs leading-relaxed">
-              Searching available Premier & Luxury rooms for <strong>{nights} night(s)</strong>, <strong>{adults} guest(s)</strong> at Hotel Samci Riviera.
-            </p>
-            <div className="pt-2 text-xs text-[#a88956] font-medium">
-              Direct Desk:&nbsp;
-              <a href="tel:+919070090713" className="underline font-bold">
-                +91 90700 90713
-              </a>
-            </div>
-          </div>
-        )}
+
+          {/* ── Reservations are taken by phone ── */}
+          <a
+            href="tel:+919070090713"
+            className="w-full py-4 bg-[#a88956] hover:bg-[#8f7343] text-white rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2.5"
+          >
+            <Phone className="w-4 h-4 shrink-0" />
+            <span className="font-bold text-xs uppercase tracking-[0.2em]">+91 90700 90713</span>
+          </a>
+
+          <p className="text-center text-[11px] text-[#7a7771] font-light leading-relaxed px-2">
+            Call the front desk with your dates and we will check availability and confirm your booking.
+          </p>
+        </div>
       </div>
     </div>
   );
