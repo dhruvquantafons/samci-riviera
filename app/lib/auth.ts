@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import { hasSupabaseConfig } from "./supabase/config";
@@ -5,8 +6,12 @@ import type { Staff } from "./types";
 
 /**
  * Resolves the signed-in staff member, or null. Does not redirect.
+ *
+ * Wrapped in React's cache() so the layout and the page it renders share a
+ * single lookup per request. Without this, each navigation paid for two
+ * round-trips to Supabase Auth and two staff queries instead of one each.
  */
-export async function getStaff(): Promise<Staff | null> {
+export const getStaff = cache(async (): Promise<Staff | null> => {
   if (!hasSupabaseConfig()) return null;
   const supabase = await createClient();
 
@@ -23,7 +28,7 @@ export async function getStaff(): Promise<Staff | null> {
 
   if (!data || !data.is_active) return null;
   return data as Staff;
-}
+});
 
 /**
  * Guard for admin pages and every server action. proxy.ts already redirects

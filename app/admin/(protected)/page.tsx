@@ -24,38 +24,44 @@ export default async function DashboardPage({
   const supabase = await createClient();
   const today = new Date().toISOString().split("T")[0];
 
-  const [newCount, arrivalsToday, departuresToday, inHouse, recent, roomCount] =
-    await Promise.all([
-      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "new"),
-      supabase
-        .from("bookings")
-        .select("id", { count: "exact", head: true })
-        .eq("check_in", today)
-        .in("status", ["new", "confirmed"]),
-      supabase
-        .from("bookings")
-        .select("id", { count: "exact", head: true })
-        .eq("check_out", today)
-        .eq("status", "checked_in"),
-      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "checked_in"),
-      supabase
-        .from("bookings")
-        .select("*, guests(id, full_name, email, phone), room_types(id, name)")
-        .order("created_at", { ascending: false })
-        .limit(8),
-      supabase.from("rooms").select("id", { count: "exact", head: true }),
-    ]);
+  const [
+    newCount,
+    arrivalsToday,
+    departuresToday,
+    inHouse,
+    recent,
+    roomCount,
+    occupied,
+  ] = await Promise.all([
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "new"),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("check_in", today)
+      .in("status", ["new", "confirmed"]),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("check_out", today)
+      .eq("status", "checked_in"),
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "checked_in"),
+    supabase
+      .from("bookings")
+      .select("*, guests(id, full_name, email, phone), room_types(id, name)")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    supabase.from("rooms").select("id", { count: "exact", head: true }),
+    // Rooms committed to a stay that covers today.
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .lte("check_in", today)
+      .gt("check_out", today)
+      .in("status", OCCUPYING_STATUSES),
+  ]);
 
   const recentBookings = (recent.data ?? []) as Booking[];
-
-  // Rooms committed to a stay that covers today.
-  const { count: occupiedToday } = await supabase
-    .from("bookings")
-    .select("id", { count: "exact", head: true })
-    .lte("check_in", today)
-    .gt("check_out", today)
-    .in("status", OCCUPYING_STATUSES);
-
+  const occupiedToday = occupied.count ?? 0;
   const totalRooms = roomCount.count ?? 0;
 
   return (
@@ -88,7 +94,7 @@ export default async function DashboardPage({
         <StatCard
           label="In house"
           value={inHouse.count ?? 0}
-          hint={totalRooms ? `${occupiedToday ?? 0} of ${totalRooms} rooms committed` : undefined}
+          hint={totalRooms ? `${occupiedToday} of ${totalRooms} rooms committed` : undefined}
         />
       </div>
 
