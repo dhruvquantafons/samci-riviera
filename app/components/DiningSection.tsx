@@ -16,7 +16,7 @@ const FACTS = [
 
 export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
   return (
-    <section id="dining" className="py-20 bg-[#141312] text-slate-200">
+    <section id="dining" className="py-14 sm:py-20 bg-[#141312] text-slate-200">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
           {/* Photograph */}
@@ -38,7 +38,7 @@ export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
               <span>Dining</span>
             </div>
 
-            <h2 className="font-serif text-3xl sm:text-4xl font-light text-white leading-tight">
+            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-light text-white leading-tight">
               Samci Restaurant
             </h2>
 

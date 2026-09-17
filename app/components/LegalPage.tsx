@@ -11,7 +11,7 @@ interface LegalPageProps {
 /** Shared shell for the Privacy, Terms, and Accessibility pages. */
 export default function LegalPage({ title, intro, children }: LegalPageProps) {
   return (
-    <main className="min-h-screen bg-[#f9f8f5] text-[#1c1b1a]">
+    <main className="page-enter min-h-screen bg-[#f9f8f5] text-[#1c1b1a]">
       {/* Masthead */}
       <header className="bg-[#141312] text-[#e6d7c3]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">

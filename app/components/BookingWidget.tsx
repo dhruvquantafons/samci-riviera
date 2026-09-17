@@ -172,7 +172,7 @@ export default function BookingWidget({
                 Hotel Samci Riviera
               </h3>
               <p className="text-[10px] text-[#9a9490] tracking-widest uppercase">
-                Palace & Resort • Srinagar
+                Hotel &bull; Srinagar
               </p>
             </div>
           </div>

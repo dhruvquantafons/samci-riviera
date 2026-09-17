@@ -50,7 +50,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
   ];
 
   return (
-    <section id="rooms" className="py-24 bg-[#f5f3ef] text-[#1c1b1a] relative">
+    <section id="rooms" className="py-14 sm:py-24 bg-[#f5f3ef] text-[#1c1b1a] relative">
       <div id="suites" className="absolute -top-20" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
@@ -59,7 +59,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
             <BedDouble className="w-3.5 h-3.5" />
             <span>OUR ACCOMMODATIONS</span>
           </div>
-          <h2 className="font-serif text-3xl sm:text-5xl font-light text-[#1c1b1a] leading-tight">
+          <h2 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-light text-[#1c1b1a] leading-tight">
             Refined Rooms, <span className="italic text-[#a88956] font-normal">Thoughtfully Designed</span>
           </h2>
           <p className="text-[#5a5854] text-sm font-light tracking-wide mt-4">

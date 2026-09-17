@@ -19,6 +19,24 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Hold the page still behind the open drawer, and close it on Escape.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileMenuOpen(false);
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [mobileMenuOpen]);
+
   const navLinks = [
     { name: "Rooms", href: "#rooms" },
     { name: "Dining", href: "#dining" },
@@ -26,6 +44,7 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
   ];
 
   return (
+    <>
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
@@ -33,22 +52,22 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
           : "bg-gradient-to-b from-black/80 via-black/40 to-transparent py-5"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
         {/* Brand Logo */}
         <a href="#" className="group flex flex-col items-start focus:outline-none">
           <span
-            className={`font-serif text-2xl sm:text-3xl font-bold tracking-[0.22em] uppercase group-hover:opacity-80 transition-all duration-300 ${
+            className={`font-serif text-lg sm:text-2xl lg:text-3xl font-bold tracking-[0.12em] sm:tracking-[0.2em] uppercase whitespace-nowrap group-hover:opacity-80 transition-all duration-300 ${
               scrolled ? "text-[#1c1b1a]" : "text-white"
             }`}
           >
             SAMCI RIVIERA
           </span>
           <span
-            className={`text-[9px] tracking-[0.35em] uppercase -mt-0.5 font-light ${
+            className={`text-[8px] sm:text-[9px] tracking-[0.2em] sm:tracking-[0.3em] uppercase -mt-0.5 font-light whitespace-nowrap ${
               scrolled ? "text-[#7a7771]" : "text-amber-100/80"
             }`}
           >
-            PALACE & RESORT • SRINAGAR
+            HOTEL &bull; SRINAGAR
           </span>
         </a>
 
@@ -108,69 +127,77 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
         </div>
       </div>
 
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-[#0b131b]/98 backdrop-blur-xl flex flex-col justify-between p-6 md:hidden animate-fade-in">
-          <div>
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-amber-500/20">
-              <div>
-                <div className="font-serif text-2xl font-bold tracking-widest gold-text-gradient">
-                  SAMCI RIVIERA
-                </div>
-                <div className="text-[9px] tracking-widest text-amber-200/60 uppercase">
-                  Palace & Resort • Srinagar
-                </div>
+    </header>
+
+    {/* Mobile Drawer */}
+    {mobileMenuOpen && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        className="fixed inset-0 z-[60] bg-[#0b131b] flex flex-col justify-between p-6 overflow-y-auto md:hidden animate-fade-in"
+      >
+        <div>
+          <div className="flex items-center justify-between mb-8 pb-4 border-b border-amber-500/20">
+            <div>
+              <div className="font-serif text-2xl font-bold tracking-widest gold-text-gradient">
+                SAMCI RIVIERA
               </div>
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-amber-200 hover:text-white p-2"
-              >
-                <X className="w-7 h-7" />
-              </button>
+              <div className="text-[9px] tracking-widest text-amber-200/60 uppercase">
+                Hotel &bull; Srinagar
+              </div>
             </div>
-
-            <nav className="flex flex-col space-y-5">
-              {navLinks.map((link, i) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={{ animationDelay: `${i * 60}ms` }}
-                  className="animate-fade-up font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
-                >
-                  {link.name}
-                </a>
-              ))}
-              <a
-                href="#gallery"
-                onClick={() => setMobileMenuOpen(false)}
-                className="font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
-              >
-                Gallery
-              </a>
-            </nav>
-          </div>
-
-          <div className="space-y-4 pt-6 border-t border-amber-500/20">
-            <div className="flex items-center justify-between text-xs text-slate-300">
-              <span>Direct Concierge:</span>
-              <a href="tel:+919070090713" className="text-[#d4af37] font-mono font-medium">
-                +91 90700 90713
-              </a>
-            </div>
-
             <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenBooking();
-              }}
-              className="w-full py-3.5 text-xs uppercase tracking-[0.2em] font-semibold text-black bg-gradient-to-r from-[#f3e5ab] via-[#d4af37] to-[#aa771c] rounded-sm text-center shadow-lg cursor-pointer"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close menu"
+              className="text-amber-200 hover:text-white p-2 cursor-pointer"
             >
-              Reserve A Room
+              <X className="w-7 h-7" />
             </button>
           </div>
+
+          <nav className="flex flex-col space-y-5">
+            {navLinks.map((link, i) => (
+              <a
+                key={link.name}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ animationDelay: `${i * 60}ms` }}
+                className="animate-fade-up font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
+              >
+                {link.name}
+              </a>
+            ))}
+            <a
+              href="#gallery"
+              onClick={() => setMobileMenuOpen(false)}
+              className="font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
+            >
+              Gallery
+            </a>
+          </nav>
         </div>
-      )}
-    </header>
+
+        <div className="space-y-4 pt-6 border-t border-amber-500/20">
+          <div className="flex items-center justify-between text-xs text-slate-300">
+            <span>Direct Concierge:</span>
+            <a href="tel:+919070090713" className="text-[#d4af37] font-mono font-medium">
+              +91 90700 90713
+            </a>
+          </div>
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onOpenBooking();
+            }}
+            className="w-full py-3.5 text-xs uppercase tracking-[0.2em] font-semibold text-black bg-gradient-to-r from-[#f3e5ab] via-[#d4af37] to-[#aa771c] rounded-sm text-center shadow-lg cursor-pointer"
+          >
+            Reserve A Room
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

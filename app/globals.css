@@ -145,6 +145,30 @@
 .animate-ken-burns  { animation: kenBurns 14s ease-out both; }
 
 /* ---------------------------------------------------------------------------
+   Anchor navigation
+   The header is fixed, so a section scrolled flush to the top would sit under
+   it. Offsetting the scroll target keeps each heading clear of the bar.
+   --------------------------------------------------------------------------- */
+section[id] {
+  scroll-margin-top: 84px;
+}
+
+/* ---------------------------------------------------------------------------
+   Route transitions
+   Played by the template.tsx files, which Next gives a fresh key on every
+   navigation, so the animation replays each time. Kept short — a page change
+   should feel responsive, not staged.
+   --------------------------------------------------------------------------- */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.page-enter {
+  animation: pageEnter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ---------------------------------------------------------------------------
    Scroll reveal
    Elements start hidden and transition in when the Reveal component marks them
    visible. Kept as a transition (not an animation) so it cannot re-trigger.

@@ -9,7 +9,7 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
   return (
     <footer className="bg-[#141312] border-t border-white/10 text-slate-400 font-sans relative overflow-hidden">
       {/* Main Footer Links & Newsletter */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <Reveal className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Brand Info Column */}
           <div className="lg:col-span-4 space-y-4">
@@ -17,8 +17,8 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
               <span className="font-serif text-3xl font-bold tracking-[0.25em] text-[#e6d7c3] uppercase">
                 SAMCI RIVIERA
               </span>
-              <div className="text-[10px] tracking-[0.4em] text-slate-400 font-sans uppercase">
-                PALACE & RESORT • SRINAGAR
+              <div className="text-[10px] tracking-[0.3em] text-slate-400 font-sans uppercase">
+                HOTEL &bull; SRINAGAR
               </div>
             </div>
 
@@ -104,9 +104,9 @@ Seasonal rates and offers, occasionally.
         </Reveal>
 
         {/* Bottom Copyright */}
-        <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+        <div className="mt-10 sm:mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
           <div>
-            © {new Date().getFullYear()} Samci Riviera Palace & Resort. All rights reserved.
+            © {new Date().getFullYear()} Hotel Samci Riviera. All rights reserved.
           </div>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             <Link href="/privacy" className="hover:text-[#e6d7c3] transition-colors">Privacy Policy</Link>

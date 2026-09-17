@@ -52,9 +52,9 @@ const FEATURES = [
 
 export default function AboutSection() {
   return (
-    <section id="about" className="py-24 bg-[#f9f8f5] text-[#1c1b1a] relative overflow-hidden">
+    <section id="about" className="py-14 sm:py-24 bg-[#f9f8f5] text-[#1c1b1a] relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-12 items-center">
           {/* Left Visual Column */}
           <Reveal className="lg:col-span-6 relative">
             <div className="relative rounded-xl overflow-hidden border border-[#e5e0d8] shadow-xl group">
@@ -63,7 +63,7 @@ export default function AboutSection() {
                 width={1560}
                 height={1080}
                 alt="Hotel Samci Riviera building exterior and reception entrance in Srinagar"
-                className="w-full h-[520px] object-cover filter contrast-[1.03] group-hover:scale-105 transition-transform duration-700"
+                className="w-full h-[340px] sm:h-[520px] object-cover filter contrast-[1.03] group-hover:scale-105 transition-transform duration-700"
               />
 
               {/* Location Emblem */}
@@ -105,7 +105,7 @@ export default function AboutSection() {
               <span>ABOUT US</span>
             </div>
 
-            <h2 className="font-serif text-3xl sm:text-5xl font-light text-[#1c1b1a] leading-tight">
+            <h2 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-light text-[#1c1b1a] leading-tight">
               A Prime Location{" "}
               <span className="italic text-[#a88956] font-normal">in the Valley</span>
             </h2>
