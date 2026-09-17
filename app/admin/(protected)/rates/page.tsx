@@ -3,6 +3,7 @@ import { requireAdmin } from "../../../lib/auth";
 import type { RoomType, ExtraCharge } from "../../../lib/types";
 import { PageHeader, Card } from "../../components/ui";
 import RoomTypeForm from "./RoomTypeForm";
+import RoomPhotoForm from "./RoomPhotoForm";
 import ExtraChargeForm from "./ExtraChargeForm";
 
 export default async function RatesPage() {
@@ -23,8 +24,11 @@ export default async function RatesPage() {
 
       <div className="space-y-6">
         {((roomTypes ?? []) as RoomType[]).map((rt) => (
-          <Card key={rt.id} className="p-5">
+          <Card key={rt.id} className="p-5 space-y-5">
             <RoomTypeForm roomType={rt} />
+            <div className="pt-5 border-t border-[#f0ece5]">
+              <RoomPhotoForm roomType={rt} />
+            </div>
           </Card>
         ))}
 

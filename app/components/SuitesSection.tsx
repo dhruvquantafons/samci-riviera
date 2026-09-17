@@ -5,6 +5,9 @@ import Image from "next/image";
 import { Maximize2, Users, Eye, CheckCircle2, ArrowRight, X, BedDouble, Info } from "lucide-react";
 import type { RoomType, ExtraCharge } from "../lib/types";
 
+/** next/image rejects an empty src, so fall back to a house photograph. */
+const PLACEHOLDER_IMAGE = "/gallery/2.jpg";
+
 interface SuitesSectionProps {
   onOpenBooking: (roomName?: string) => void;
   rooms: RoomType[];
@@ -72,7 +75,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
                 {/* Image Container */}
                 <div className="relative h-72 overflow-hidden">
                   <Image
-                    src={room.image}
+                    src={room.image || PLACEHOLDER_IMAGE}
                     alt={room.name}
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
@@ -194,7 +197,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
             </button>
 
             <Image
-              src={selectedModalRoom.image}
+              src={selectedModalRoom.image || PLACEHOLDER_IMAGE}
               alt={selectedModalRoom.name}
               width={1620}
               height={1080}

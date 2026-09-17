@@ -296,6 +296,84 @@ export async function updateExtraCharge(
   return { success: "Charge updated." };
 }
 
+// ── Room photography (admin only) ──────────────────────────────────────────
+
+const ROOM_PHOTO_BUCKET = "room-photos";
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+
+/** Extracts the object path from a public storage URL, or null if not ours. */
+function storagePathFromUrl(url: string): string | null {
+  const marker = `/storage/v1/object/public/${ROOM_PHOTO_BUCKET}/`;
+  const at = url.indexOf(marker);
+  return at === -1 ? null : url.slice(at + marker.length);
+}
+
+export async function uploadRoomPhoto(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const id = str(formData, "id");
+  const file = formData.get("photo");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose an image to upload." };
+  }
+  if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+    return { error: "Use a JPEG, PNG, WebP or AVIF image." };
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    return { error: "That image is larger than 5 MB. Please compress it first." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: roomType, error: lookupError } = await supabase
+    .from("room_types")
+    .select("slug, image")
+    .eq("id", id)
+    .single();
+
+  if (lookupError || !roomType) return { error: "Room type not found." };
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  // Unique name per upload so CDN caches never serve the previous photo.
+  const objectPath = `${roomType.slug}-${Date.now()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(ROOM_PHOTO_BUCKET)
+    .upload(objectPath, file, { contentType: file.type, upsert: false });
+
+  if (uploadError) return { error: `Upload failed: ${uploadError.message}` };
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(ROOM_PHOTO_BUCKET).getPublicUrl(objectPath);
+
+  const { error: saveError } = await supabase
+    .from("room_types")
+    .update({ image: publicUrl })
+    .eq("id", id);
+
+  if (saveError) {
+    // Do not leave an orphaned object behind if the row could not be updated.
+    await supabase.storage.from(ROOM_PHOTO_BUCKET).remove([objectPath]);
+    return { error: saveError.message };
+  }
+
+  // Tidy up the photo this one replaced, if it lived in our bucket.
+  const previous = storagePathFromUrl(roomType.image ?? "");
+  if (previous && previous !== objectPath) {
+    await supabase.storage.from(ROOM_PHOTO_BUCKET).remove([previous]);
+  }
+
+  revalidatePath("/admin/rates");
+  revalidatePath("/");
+  return { success: "Photo updated. The website now shows the new image." };
+}
+
 // ── Staff (admin only) ──────────────────────────────────────────────────────
 
 export async function updateStaffMember(formData: FormData) {
