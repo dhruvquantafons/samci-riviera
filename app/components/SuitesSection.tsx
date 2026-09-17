@@ -8,6 +8,25 @@ import type { RoomType, ExtraCharge } from "../lib/types";
 /** next/image rejects an empty src, so fall back to a house photograph. */
 const PLACEHOLDER_IMAGE = "/gallery/2.jpg";
 
+/**
+ * Turns a category key into a tab label. Categories are admin-authored, so
+ * "premier" reads as "Premier Rooms" while "royal-suite" reads as
+ * "Royal Suites" rather than "Royal-suite Rooms".
+ */
+function categoryLabel(category: string) {
+  const words = category
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+  if (!words) return "Rooms";
+  if (/\b(suite|room)s?$/i.test(words)) {
+    return words.endsWith("s") ? words : `${words}s`;
+  }
+  return `${words} Rooms`;
+}
+
 interface SuitesSectionProps {
   onOpenBooking: (roomName?: string) => void;
   rooms: RoomType[];
@@ -25,7 +44,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
     { id: "all", label: "All Rooms" },
     ...Array.from(new Set(rooms.map((r) => r.category))).map((category) => ({
       id: category,
-      label: `${category.charAt(0).toUpperCase()}${category.slice(1)} Rooms`,
+      label: categoryLabel(category),
     })),
   ];
 

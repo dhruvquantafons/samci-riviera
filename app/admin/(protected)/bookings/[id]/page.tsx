@@ -225,15 +225,6 @@ export default async function BookingDetailPage({
                 </a>
               )}
             </div>
-
-            {booking.guest_id && (
-              <Link
-                href={`/admin/guests/${booking.guest_id}`}
-                className={`${secondaryButtonClass} mt-4 inline-block`}
-              >
-                Open guest record
-              </Link>
-            )}
           </Card>
 
           <Card className="p-5">

@@ -152,45 +152,6 @@ export async function addBookingNote(formData: FormData) {
   revalidatePath(`/admin/bookings/${bookingId}`);
 }
 
-// ── Guests ──────────────────────────────────────────────────────────────────
-
-export async function updateGuest(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  await requireStaff();
-  const supabase = await createClient();
-  const id = str(formData, "id");
-
-  const fullName = str(formData, "full_name");
-  if (!fullName) return { error: "Name is required." };
-
-  const tags = str(formData, "tags")
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
-
-  const { error } = await supabase
-    .from("guests")
-    .update({
-      full_name: fullName,
-      email: str(formData, "email") || null,
-      phone: str(formData, "phone") || null,
-      address: str(formData, "address"),
-      city: str(formData, "city"),
-      country: str(formData, "country"),
-      tags,
-      notes: str(formData, "notes"),
-    })
-    .eq("id", id);
-
-  if (error) return { error: error.message };
-
-  revalidatePath(`/admin/guests/${id}`);
-  revalidatePath("/admin/guests");
-  return { success: "Guest updated." };
-}
-
 // ── Rooms ───────────────────────────────────────────────────────────────────
 
 export async function createRoom(
@@ -243,6 +204,123 @@ export async function deleteRoom(formData: FormData) {
 
 // ── Rates (admin only) ──────────────────────────────────────────────────────
 
+/** URL-safe key derived from a display name. */
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+/** One highlight per line, trimmed, capped so a card cannot overflow. */
+function parseHighlights(formData: FormData) {
+  return str(formData, "highlights")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+export async function createRoomType(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  const name = str(formData, "name");
+  const rate = num(formData, "base_rate");
+
+  if (!name) return { error: "Give the room type a name." };
+  if (rate === null || rate < 0) return { error: "Enter a valid nightly rate." };
+
+  const baseSlug = slugify(name);
+  if (!baseSlug) return { error: "That name cannot be turned into a web address." };
+
+  // Place it last in the running order.
+  const { data: lastRow } = await supabase
+    .from("room_types")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const payload = {
+    name,
+    category: slugify(str(formData, "category")) || baseSlug,
+    tagline: str(formData, "tagline"),
+    description: str(formData, "description"),
+    size: str(formData, "size"),
+    occupancy: str(formData, "occupancy"),
+    view: str(formData, "view"),
+    highlights: parseHighlights(formData),
+    base_rate: rate,
+    is_active: formData.get("is_active") === "on",
+    sort_order: (lastRow?.sort_order ?? 0) + 1,
+  };
+
+  // Retry once with a numeric suffix if the slug is taken.
+  let slug = baseSlug;
+  let inserted = await supabase.from("room_types").insert({ ...payload, slug });
+
+  if (inserted.error?.code === "23505") {
+    slug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
+    inserted = await supabase.from("room_types").insert({ ...payload, slug });
+  }
+
+  if (inserted.error) return { error: inserted.error.message };
+
+  revalidatePath("/admin/rates");
+  revalidatePath("/admin/rooms");
+  revalidatePath("/");
+  return {
+    success: `${name} created. Add a photo below, and it will appear on the website.`,
+  };
+}
+
+/**
+ * Removes a room type outright. Only possible while nothing references it —
+ * Postgres restricts deletion once rooms exist, and we check bookings too so
+ * history is never silently detached from its room type.
+ */
+export async function deleteRoomType(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const id = str(formData, "id");
+
+  const [{ count: roomCount }, { count: bookingCount }] = await Promise.all([
+    supabase.from("rooms").select("id", { count: "exact", head: true }).eq("room_type_id", id),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("room_type_id", id),
+  ]);
+
+  if ((roomCount ?? 0) > 0) {
+    return {
+      error: `Still used by ${roomCount} room(s) in inventory. Reassign or remove them first.`,
+    };
+  }
+  if ((bookingCount ?? 0) > 0) {
+    return {
+      error: `Used by ${bookingCount} booking(s). Untick "Show on website" to retire it instead.`,
+    };
+  }
+
+  const { error } = await supabase.from("room_types").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/rates");
+  revalidatePath("/");
+  return { success: "Room type deleted." };
+}
+
 export async function updateRoomType(
   _prev: ActionState,
   formData: FormData,
@@ -257,11 +335,13 @@ export async function updateRoomType(
     .from("room_types")
     .update({
       name: str(formData, "name"),
+      category: slugify(str(formData, "category")) || "rooms",
       tagline: str(formData, "tagline"),
       description: str(formData, "description"),
       size: str(formData, "size"),
       occupancy: str(formData, "occupancy"),
       view: str(formData, "view"),
+      highlights: parseHighlights(formData),
       base_rate: rate,
       is_active: formData.get("is_active") === "on",
     })
@@ -376,23 +456,35 @@ export async function uploadRoomPhoto(
 
 // ── Staff (admin only) ──────────────────────────────────────────────────────
 
-export async function updateStaffMember(formData: FormData) {
+export async function updateStaffMember(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const admin = await requireAdmin();
   const supabase = await createClient();
   const id = str(formData, "id");
 
-  // Guard against an admin removing their own access and locking everyone out.
-  if (id === admin.id) return;
+  const fullName = str(formData, "full_name");
+  if (!fullName) return { error: "Name is required." };
 
-  await supabase
-    .from("staff")
-    .update({
-      role: str(formData, "role"),
-      is_active: str(formData, "is_active") === "true",
-    })
-    .eq("id", id);
+  // Details anyone may have; role and access only for other people, so an
+  // admin cannot demote or suspend themselves and lock the team out.
+  const details: Record<string, string | boolean> = {
+    full_name: fullName,
+    phone: str(formData, "phone"),
+    job_title: str(formData, "job_title"),
+  };
+
+  if (id !== admin.id) {
+    details.role = str(formData, "role");
+    details.is_active = str(formData, "is_active") === "true";
+  }
+
+  const { error } = await supabase.from("staff").update(details).eq("id", id);
+  if (error) return { error: error.message };
 
   revalidatePath("/admin/staff");
+  return { success: "Staff member updated." };
 }
 
 // ── Session ─────────────────────────────────────────────────────────────────

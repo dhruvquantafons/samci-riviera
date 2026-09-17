@@ -49,6 +49,10 @@ export default function RoomTypeForm({ roomType }: { roomType: RoomType }) {
         <input name="tagline" defaultValue={roomType.tagline} className={inputClass} />
       </Field>
 
+      <Field label="Category" hint="Groups the filter tabs on the website.">
+        <input name="category" defaultValue={roomType.category} className={inputClass} />
+      </Field>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Size">
           <input name="size" defaultValue={roomType.size} className={inputClass} />
@@ -60,6 +64,15 @@ export default function RoomTypeForm({ roomType }: { roomType: RoomType }) {
           <input name="view" defaultValue={roomType.view} className={inputClass} />
         </Field>
       </div>
+
+      <Field label="Highlights" hint="One per line, up to six. The ticked list on the card.">
+        <textarea
+          name="highlights"
+          rows={4}
+          defaultValue={roomType.highlights.join("\n")}
+          className={inputClass}
+        />
+      </Field>
 
       <Field label="Description">
         <textarea

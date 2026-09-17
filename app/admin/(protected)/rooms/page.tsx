@@ -1,27 +1,36 @@
+import Link from "next/link";
 import { createClient } from "../../../lib/supabase/server";
 import { requireStaff } from "../../../lib/auth";
 import type { Room, RoomType, Booking } from "../../../lib/types";
 import { OCCUPYING_STATUSES, ROOM_STATUS_LABELS } from "../../../lib/types";
 import { updateRoomStatus } from "../../actions";
-import { PageHeader, Card, EmptyState, inputClass } from "../../components/ui";
+import { PageHeader, Card, EmptyState, inputClass, fmtDate } from "../../components/ui";
 import AddRoomForm from "./AddRoomForm";
 import AvailabilityCalendar from "./AvailabilityCalendar";
 
-export default async function RoomsPage() {
+export default async function RoomsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
   await requireStaff();
   const supabase = await createClient();
 
-  // Two weeks of occupancy from today is enough for the desk to plan around.
-  const start = new Date();
-  const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d.toISOString().split("T")[0];
-  });
-  const windowStart = days[0];
-  const windowEnd = days[days.length - 1];
+  // Calendar month to display, defaulting to the current one.
+  const { month } = await searchParams;
+  const today = new Date();
+  const monthStart = /^\d{4}-\d{2}-01$/.test(month ?? "")
+    ? month!
+    : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
 
-  const [{ data: rooms }, { data: roomTypes }, { data: booked }] = await Promise.all([
+  const first = new Date(monthStart + "T00:00:00");
+  const windowStart = monthStart;
+  const windowEnd = new Date(first.getFullYear(), first.getMonth() + 1, 0)
+    .toISOString()
+    .split("T")[0];
+
+  const [{ data: rooms }, { data: roomTypes }, { data: booked }, { data: inHouse }] =
+    await Promise.all([
     supabase.from("rooms").select("*, room_types(name, slug)").order("room_number"),
     supabase.from("room_types").select("*").order("sort_order"),
     supabase
@@ -30,21 +39,53 @@ export default async function RoomsPage() {
       .in("status", OCCUPYING_STATUSES)
       .lte("check_in", windowEnd)
       .gt("check_out", windowStart),
+    // Who is currently in each room, so the desk can see why it is occupied.
+    supabase
+      .from("bookings")
+      .select("id, reference, contact_name, room_id, check_out, guests(full_name)")
+      .eq("status", "checked_in")
+      .not("room_id", "is", null),
   ]);
 
   const roomList = (rooms ?? []) as Room[];
   const types = (roomTypes ?? []) as RoomType[];
   const bookings = (booked ?? []) as Booking[];
 
+  // Narrow shape: this query selects only what the inventory table renders.
+  type Occupant = {
+    id: string;
+    contact_name: string;
+    room_id: string | null;
+    check_out: string;
+    guests: { full_name: string } | { full_name: string }[] | null;
+  };
+
+  const occupantByRoom = new Map(
+    ((inHouse ?? []) as unknown as Occupant[])
+      .filter((b) => b.room_id)
+      .map((b) => [b.room_id as string, b]),
+  );
+
+  // Supabase types an embedded to-one relation as an array in some versions.
+  const guestName = (o: Occupant) =>
+    (Array.isArray(o.guests) ? o.guests[0]?.full_name : o.guests?.full_name) ||
+    o.contact_name ||
+    "Guest";
+
   return (
     <>
       <PageHeader
         title="Rooms"
-        description="Inventory and the next two weeks of committed occupancy."
+        description="Inventory and committed occupancy, month by month."
       />
 
       <div className="space-y-6">
-        <AvailabilityCalendar days={days} roomTypes={types} rooms={roomList} bookings={bookings} />
+        <AvailabilityCalendar
+          month={monthStart}
+          roomTypes={types}
+          rooms={roomList}
+          bookings={bookings}
+        />
 
         <Card className="p-5">
           <h2 className="font-serif text-lg text-[#1c1b1a] font-medium mb-4">Add a room</h2>
@@ -55,6 +96,12 @@ export default async function RoomsPage() {
           <h2 className="font-serif text-lg text-[#1c1b1a] font-medium px-5 py-4 border-b border-[#f0ece5]">
             Inventory ({roomList.length})
           </h2>
+
+          <p className="px-5 pb-3 -mt-1 text-[11px] text-[#9a9490] font-light">
+            Occupied is set automatically when a booking with this room assigned is
+            checked in, and cleared on check-out. Use maintenance or out of service to
+            take a room off sale.
+          </p>
 
           {roomList.length === 0 ? (
             <EmptyState message="No rooms added yet. Add your first room above." />
@@ -67,6 +114,7 @@ export default async function RoomsPage() {
                     <th className="px-5 py-3 font-semibold">Type</th>
                     <th className="px-5 py-3 font-semibold">Floor</th>
                     <th className="px-5 py-3 font-semibold">Status</th>
+                    <th className="px-5 py-3 font-semibold">Occupant</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f0ece5]">
@@ -95,6 +143,25 @@ export default async function RoomsPage() {
                             Update status
                           </button>
                         </form>
+                      </td>
+                      <td className="px-5 py-3">
+                        {(() => {
+                          const stay = occupantByRoom.get(room.id);
+                          if (!stay) {
+                            return <span className="text-[#c9c4bc]">—</span>;
+                          }
+                          return (
+                            <Link
+                              href={`/admin/bookings/${stay.id}`}
+                              className="text-[#a88956] hover:text-[#8f7343] transition-colors"
+                            >
+                              {guestName(stay)}
+                              <span className="block text-[11px] text-[#9a9490]">
+                                out {fmtDate(stay.check_out)}
+                              </span>
+                            </Link>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}

@@ -6,7 +6,6 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   CalendarCheck,
-  Users,
   BedDouble,
   IndianRupee,
   UserCog,
@@ -20,7 +19,6 @@ import { signOut } from "../actions";
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
-  { href: "/admin/guests", label: "Guests", icon: Users },
   { href: "/admin/rooms", label: "Rooms", icon: BedDouble },
   { href: "/admin/rates", label: "Rates", icon: IndianRupee, adminOnly: true },
   { href: "/admin/staff", label: "Staff", icon: UserCog, adminOnly: true },

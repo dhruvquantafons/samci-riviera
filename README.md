@@ -32,8 +32,10 @@ variables; the admin panel shows a setup notice until Supabase is configured.
 The admin panel at `/admin` needs a Supabase project.
 
 1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard).
-2. In the SQL editor, run `supabase/migrations/0001_init.sql`. It creates the
-   schema, the row level security policies, and seeds the published tariff.
+2. In the SQL editor, run each file in `supabase/migrations/` **in order**:
+   `0001_init.sql` (schema, RLS policies, tariff seed), `0002_room_photos.sql`
+   (storage bucket for room photography), then
+   `0003_room_status_and_staff.sql` (room occupancy triggers, staff details).
 3. Copy the URL, anon key, and service role key from **Project Settings → API**
    into `.env.local` (see `.env.example`).
 4. Add your first user under **Authentication → Users**. The first account
@@ -89,12 +91,11 @@ app/
     ├── login/              Sign-in (outside the guarded layout)
     ├── components/         Sidebar, shared UI, setup notice
     └── (protected)/        Route group wrapped by the auth guard
-        ├── page.tsx        Dashboard: today's arrivals, departures, in-house
+        ├── page.tsx        Dashboard: movements, occupancy, revenue, alerts
         ├── bookings/       Inbox, filters, detail, notes, manual entry
-        ├── guests/         CRM list, profile, stay history, tags
-        ├── rooms/          Inventory + 14-day availability grid
-        ├── rates/          Edit the public tariff (admin only)
-        └── staff/          Roles and access (admin only)
+        ├── rooms/          Inventory + month availability calendar
+        ├── rates/          Tariff and room photos (admin only)
+        └── staff/          Details, roles and access (admin only)
 
 public/gallery/             1.jpg – 14.jpg, the hotel's own photography
 ```
@@ -113,16 +114,34 @@ Reservations arrive two ways, both landing in the same inbox:
   linked automatically rather than duplicated.
 
 Availability is derived, not stored: a booking occupies a night when
-`check_in <= night < check_out`, counted per room type against the rooms in
-inventory. Only `new`, `confirmed` and `checked_in` bookings count.
+`check_in <= night < check_out`, counted against the rooms in inventory. Only
+`new`, `confirmed` and `checked_in` bookings count. The Rooms page shows this
+as a month calendar you can page through.
+
+**Room status is automatic.** A database trigger (`sync_room_status`) marks a
+room `occupied` when a booking with that room assigned is checked in, and
+releases it on check-out, cancellation or reassignment. It lives in Postgres
+rather than the app so the rule holds however a booking is changed. It only
+ever releases a room it had marked `occupied`, so a `maintenance` or
+`out_of_service` hold set by a person is never overwritten.
+
+There is no guest CRM section. The `guests` table still exists and bookings are
+still linked to a guest record — matching on email or phone so repeat visitors
+are not duplicated — but there is no UI for browsing it.
 
 ## Roles
 
 | | Front desk | Administrator |
 |---|---|---|
-| Bookings, guests, rooms | ✅ | ✅ |
-| Edit public rates | — | ✅ |
-| Manage staff and roles | — | ✅ |
+| Bookings and rooms | ✅ | ✅ |
+| Edit rates and room photos | — | ✅ |
+| Manage staff details and roles | — | ✅ |
+
+Adding a staff member is two steps: create their login in the Supabase
+dashboard under **Authentication → Users**, then fill in their name, job title
+and phone under **Staff** in the panel. They appear there automatically as
+front desk. An administrator cannot change their own role or access, which
+prevents locking the whole team out.
 
 Enforced in three places: `proxy.ts` redirects signed-out traffic, the
 `(protected)` layout re-checks with `requireStaff()`, and every server action
@@ -136,7 +155,7 @@ Facts on the site are taken from the hotel's published material and should not b
 - **Rates** now live in the database and are edited at `/admin/rates`. The published tariff (Premier ₹9,499, Luxury ₹10,799, extra occupant ₹2,200, child without bed ₹1,500, buffet ₹1,470, child meal ₹750) is seeded by the migration and duplicated in `app/lib/rates-fallback.ts`, which serves the public site if Supabase is unreachable. Keep the two in step.
 - **Rates are quoted on the CPAI plan** — accommodation with breakfast — and are inclusive of applicable taxes. Lunch and dinner are charged separately. This is stated on the room cards, the detail modal, the charges panel, and the admin rates page.
 - **Contact details** (`0194-3500113`, `+91 90700 90713`, `0194-3517164`, `info@hotelsamciriviera.com`) live in `app/lib/site.ts` and in `Footer.tsx`.
-- **Photography** in `public/gallery/` is the hotel's own, mirrored from the original site. It is the only genuine imagery in the repo.
+- **Photography** in `public/gallery/` is the hotel's own, mirrored from the original site. It is the only genuine imagery in the repo. Room photographs can be replaced from `/admin/rates`, which uploads to the `room-photos` Supabase Storage bucket and points the room type at the new public URL.
 
 ## Known gaps
 
@@ -157,7 +176,11 @@ Tracked so nobody rediscovers them:
 5. **Availability does not block overbooking.** The grid shows committed
    occupancy, but nothing prevents accepting a booking beyond capacity — by
    design, since the desk often oversells deliberately. Add a check if wanted.
-6. **Seven lint warnings remain**, all pre-existing: unused icon imports and
+6. **Manual room status can drift.** Setting a room to `available` by hand while
+   a guest is checked into it is not corrected — the trigger only reacts to
+   booking changes. The Occupant column on the inventory table makes any
+   mismatch visible.
+7. **Seven lint warnings remain**, all pre-existing: unused icon imports and
    `<img>` instead of `<Image>` in the Dining, Experiences and Hero sections.
 
 ## Data protection
