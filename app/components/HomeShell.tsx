@@ -3,10 +3,9 @@
 import { useState } from "react";
 import Navbar from "./Navbar";
 import HeroSection from "./HeroSection";
-import WelcomeSection from "./WelcomeSection";
+import AboutSection from "./AboutSection";
 import SuitesSection from "./SuitesSection";
 import DiningSection from "./DiningSection";
-import ExperiencesSection from "./ExperiencesSection";
 import GallerySection from "./GallerySection";
 import BookingWidget from "./BookingWidget";
 import Footer from "./Footer";
@@ -31,10 +30,9 @@ export default function HomeShell({
     <main className="min-h-screen bg-[#0b131b] text-slate-100 selection:bg-[#c5a059] selection:text-black">
       <Navbar onOpenBooking={handleOpenBooking} />
       <HeroSection onOpenBooking={handleOpenBooking} rooms={rooms} />
-      <WelcomeSection />
+      <AboutSection />
       <SuitesSection onOpenBooking={handleOpenBooking} rooms={rooms} charges={charges} />
       <DiningSection onOpenBooking={handleOpenBooking} />
-      <ExperiencesSection onOpenBooking={handleOpenBooking} />
       <GallerySection />
       <Footer rooms={rooms} />
 

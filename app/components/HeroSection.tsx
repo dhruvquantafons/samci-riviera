@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Users, ChevronRight, Play, Pause, Sparkles, MapPin, Award } from "lucide-react";
+import { Calendar, Users, ChevronRight, Sparkles, MapPin, Award } from "lucide-react";
 import type { RoomType } from "../lib/types";
 import { todayIso, isoPlusDays } from "../lib/dates";
 
@@ -29,14 +29,15 @@ const HERO_SLIDES = [
     id: 3,
     image: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=2070&auto=format&fit=crop",
     tagline: "EPICUREAN HAVEN",
-    heading: "Authentic Dining & Culinary Delights",
+    heading: "Authentic Kashmiri Dining Culinary Delights",
     subtext: "Savor exquisite Kashmiri Wazwan heritage recipes and international favorites crafted with the freshest local ingredients.",
   },
 ];
 
 export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [takenOver, setTakenOver] = useState(false);
 
   // Quick reservation state
   const [checkIn, setCheckIn] = useState(todayIso);
@@ -45,12 +46,16 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
   const [roomType, setRoomType] = useState(rooms[0]?.name ?? "");
 
   useEffect(() => {
-    if (!isPlaying) return;
+    // Someone who asked for reduced motion gets a still hero, and anyone who
+    // chooses a slide has taken control, so stop advancing under them.
+    if (paused || takenOver) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length);
     }, 7000);
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [paused, takenOver]);
 
   const handleQuickBook = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +63,13 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
   };
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-between pt-28 sm:pt-32 pb-12 overflow-hidden bg-[#070c12]">
+    <section
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+      className="relative min-h-screen flex flex-col justify-between pt-28 sm:pt-32 pb-12 overflow-hidden bg-[#070c12]"
+    >
       {/* Background Media Carousel */}
       <div className="absolute inset-0 z-0">
         {HERO_SLIDES.map((slide, index) => (
@@ -85,23 +96,11 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
       </div>
 
       {/* Floating Controls Bar (Positioned below main sticky header) */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 w-full flex justify-between items-center text-xs text-amber-100/80 mb-4 pt-4">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 w-full flex items-center text-xs text-amber-100/80 mb-4 pt-4">
         <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-amber-500/20 shadow-lg">
           <MapPin className="w-3.5 h-3.5 text-[#d4af37]" />
-          <span className="tracking-wider uppercase text-[11px] font-medium text-slate-200">Dal Lake • Srinagar, Kashmir</span>
+          <span className="tracking-wider uppercase text-[11px] font-medium text-slate-200">Srinagar • Kashmir</span>
         </div>
-
-        <button
-          onClick={() => setIsPlaying(!isPlaying)}
-          aria-pressed={!isPlaying}
-          aria-label={isPlaying ? "Pause the slideshow" : "Play the slideshow"}
-          className="flex items-center gap-2 px-3 py-1.5 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full border border-amber-500/20 text-amber-200 hover:text-white transition-colors cursor-pointer"
-        >
-          {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 text-[#d4af37]" />}
-          <span className="text-[10px] uppercase tracking-widest">
-            {isPlaying ? "Pause" : "Play"}
-          </span>
-        </button>
       </div>
 
       {/* Main Hero Content */}
@@ -157,11 +156,15 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
           {HERO_SLIDES.map((_, idx) => (
             <button
               key={idx}
-              onClick={() => setCurrentSlide(idx)}
+              onClick={() => {
+                setCurrentSlide(idx);
+                setTakenOver(true);
+              }}
               className={`h-1 transition-all duration-500 rounded-full ${
                 idx === currentSlide ? "w-10 bg-[#e6d7c3]" : "w-3 bg-white/30 hover:bg-white/60"
               }`}
-              aria-label={`Go to slide ${idx + 1}`}
+              aria-label={`Show slide ${idx + 1} of ${HERO_SLIDES.length}`}
+              aria-current={idx === currentSlide}
             />
           ))}
         </div>

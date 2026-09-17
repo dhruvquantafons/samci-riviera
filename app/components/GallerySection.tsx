@@ -96,7 +96,7 @@ export default function GallerySection() {
             Moments Worth <span className="italic text-[#a88956] font-normal">Remembering</span>
           </h2>
           <p className="text-[#5a5854] text-sm font-light tracking-wide mt-4">
-            A look inside Hotel Samci Riviera — our rooms and suites, en-suite bathrooms, reception lobby, and conference spaces in the heart of Srinagar.
+A look inside the hotel.
           </p>
         </Reveal>
 

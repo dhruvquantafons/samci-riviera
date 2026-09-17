@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Phone, Menu, X, Calendar, Sparkles } from "lucide-react";
+import { Phone, Menu, X, Calendar } from "lucide-react";
 
 interface NavbarProps {
   onOpenBooking: (suiteName?: string) => void;
@@ -20,10 +20,9 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
   }, []);
 
   const navLinks = [
-    { name: "Overview", href: "#overview" },
     { name: "Rooms", href: "#rooms" },
     { name: "Dining", href: "#dining" },
-    { name: "Experiences", href: "#experiences" },
+    { name: "About", href: "#about" },
   ];
 
   return (

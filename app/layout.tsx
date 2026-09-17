@@ -3,16 +3,18 @@ import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SITE } from "./lib/site";
 
-const cormorant = Cormorant_Garamond({
-  variable: "--font-cormorant",
+const display = Cormorant_Garamond({
+  variable: "--font-display",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
-const plusJakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
+const body = Plus_Jakarta_Sans({
+  variable: "--font-body",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
 const TITLE = `${SITE.name} | ${SITE.tagline}`;
@@ -69,7 +71,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${cormorant.variable} ${plusJakarta.variable} h-full antialiased scroll-smooth`}
+      className={`${display.variable} ${body.variable} h-full antialiased scroll-smooth`}
     >
       <head>
         {/* Scroll reveals start transparent. Without JavaScript nothing would

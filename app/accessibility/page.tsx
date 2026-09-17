@@ -35,7 +35,16 @@ export default function AccessibilityPage() {
           <li>Every photograph and decorative image carries a meaningful text alternative or is hidden from screen readers.</li>
           <li>Interactive elements are real buttons and links, so they can be reached and operated with a keyboard.</li>
           <li>The photo gallery can be opened, navigated, and closed using the arrow and Escape keys.</li>
-          <li>Visible focus outlines are kept in place rather than removed.</li>
+          <li>Visible focus outlines are kept in place rather than removed, and styled consistently across every link, button and form field.</li>
+          <li>
+            The homepage hero stops rotating while it is hovered or keyboard-focused, as
+            soon as a visitor chooses a slide themselves, and entirely for anyone whose
+            system asks for reduced motion.
+          </li>
+          <li>
+            Animation is switched off wholesale for visitors who ask for reduced motion,
+            and all content stays readable if JavaScript does not run.
+          </li>
           <li>Body text is set at a size and contrast intended to remain readable against our background colours.</li>
           <li>The layout reflows for small screens and supports browser zoom without loss of content.</li>
         </ul>
@@ -49,6 +58,12 @@ export default function AccessibilityPage() {
             reviewed.
           </li>
           <li>We have not yet tested the site end to end with every major screen reader.</li>
+          <li>
+            The homepage hero has no always-visible pause button. It stops on hover, on
+            keyboard focus, when a slide is chosen, and for reduced-motion visitors, but
+            WCAG success criterion 2.2.2 asks for an explicit control and we do not yet
+            provide one.
+          </li>
         </ul>
       </LegalSection>
 

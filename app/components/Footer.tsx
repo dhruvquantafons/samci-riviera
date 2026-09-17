@@ -1,47 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, Phone, Mail, Award, Send } from "lucide-react";
+import { MapPin, Phone, Mail, Send } from "lucide-react";
 import Reveal from "./Reveal";
 import type { RoomType } from "../lib/types";
 
 export default function Footer({ rooms }: { rooms: RoomType[] }) {
   return (
     <footer className="bg-[#141312] border-t border-white/10 text-slate-400 font-sans relative overflow-hidden">
-      {/* Top Awards Bar */}
-      <div className="border-b border-white/10 py-10 bg-[#1a1918]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-6">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-[#e6d7c3] font-semibold flex items-center justify-center gap-1.5">
-              <Award className="w-3.5 h-3.5 text-[#e6d7c3]" />
-              <span>GLOBAL RECOGNITION & ACCLAIM</span>
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
-              <div className="font-serif text-xl text-white font-medium">Condé Nast Traveler</div>
-              <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">GOLD LIST 2026</div>
-            </div>
-
-            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
-              <div className="font-serif text-xl text-white font-medium">Forbes Travel Guide</div>
-              <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">FIVE-STAR AWARD</div>
-            </div>
-
-            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
-              <div className="font-serif text-xl text-white font-medium">World Luxury Hotels</div>
-              <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">BEST PALACE RESORT</div>
-            </div>
-
-            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
-              <div className="font-serif text-xl text-white font-medium">Michelin Guide</div>
-              <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">3 RED KEYS SELECTION</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Footer Links & Newsletter */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <Reveal className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -57,7 +23,7 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
             </div>
 
             <p className="text-xs text-slate-400 font-light leading-relaxed">
-              Situated at the prime location in the heart of Srinagar, at the bank of the Jhelum River, Hotel Samci Riviera offers warm Kashmiri hospitality, modern comfort, and a memorable stay just 1.5 km from Dal Lake.
+Warm Kashmiri hospitality on the bank of the Jhelum, 1.5 km from Dal Lake.
             </p>
 
             <div className="space-y-2 text-xs text-slate-300 pt-2">
@@ -96,14 +62,12 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
           {/* Dining & Experiences Links Column */}
           <div className="lg:col-span-2 space-y-3">
             <h4 className="font-serif text-base text-white font-medium border-b border-white/10 pb-2">
-              Dining & Experiences
+              Hotel
             </h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#dining" className="hover:text-[#e6d7c3] transition-colors">Sheesh Mahal Restaurant</a></li>
-              <li><a href="#dining" className="hover:text-[#e6d7c3] transition-colors">The Riviera Cafe & Breakfast</a></li>
-              <li><a href="#experiences" className="hover:text-[#e6d7c3] transition-colors">Private Candlelight Dining</a></li>
-              <li><a href="#experiences" className="hover:text-[#e6d7c3] transition-colors">Sunset Shikara Cruise</a></li>
-              <li><a href="#gallery" className="hover:text-[#e6d7c3] transition-colors">Palace Photo Gallery</a></li>
+              <li><a href="#dining" className="hover:text-[#e6d7c3] transition-colors">Samci Restaurant</a></li>
+              <li><a href="#gallery" className="hover:text-[#e6d7c3] transition-colors">Photo Gallery</a></li>
+              <li><a href="#about" className="hover:text-[#e6d7c3] transition-colors">Conference &amp; Events</a></li>
             </ul>
           </div>
 
@@ -113,7 +77,7 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
               The Royal Gazette
             </h4>
             <p className="text-xs text-slate-400 font-light">
-              Subscribe to receive exclusive seasonal rates, room offers, and curated Kashmiri event updates.
+Seasonal rates and offers, occasionally.
             </p>
 
             <form onSubmit={(e) => { e.preventDefault(); alert("Thank you for subscribing to The Royal Gazette."); }} className="space-y-2">

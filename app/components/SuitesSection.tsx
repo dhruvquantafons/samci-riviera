@@ -63,7 +63,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
             Refined Rooms, <span className="italic text-[#a88956] font-normal">Thoughtfully Designed</span>
           </h2>
           <p className="text-[#5a5854] text-sm font-light tracking-wide mt-4">
-            Every room at Samci Riviera is a tranquil haven of tasteful Kashmiri woodwork, plush bedding, modern conveniences, and scenic valley views.
+Kashmiri woodwork, plush bedding, and valley views.
           </p>
         </Reveal>
 

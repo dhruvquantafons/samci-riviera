@@ -2,8 +2,8 @@
 
 @layer base {
   :root {
-    --font-serif: var(--font-cormorant), Georgia, serif;
-    --font-sans: var(--font-jakarta), system-ui, sans-serif;
+    --font-serif: var(--font-display), Georgia, serif;
+    --font-sans: var(--font-body), system-ui, sans-serif;
     --sand-primary: #d9c3a3;
     --sand-secondary: #e6d7c3;
     --sand-light: #f5f3ef;
@@ -14,11 +14,11 @@
 }
 
 .font-serif {
-  font-family: var(--font-cormorant), Georgia, serif;
+  font-family: var(--font-display), Georgia, serif;
 }
 
 .font-sans {
-  font-family: var(--font-jakarta), system-ui, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
 }
 
 /* Sand & Gold Gradient Text */
