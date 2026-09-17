@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Users, ChevronRight, Play, Volume2, VolumeX, Sparkles, MapPin, Award } from "lucide-react";
+import { Calendar, Users, ChevronRight, Play, Pause, Sparkles, MapPin, Award } from "lucide-react";
 import type { RoomType } from "../lib/types";
+import { todayIso, isoPlusDays } from "../lib/dates";
 
 interface HeroSectionProps {
   onOpenBooking: (roomName?: string) => void;
@@ -36,13 +37,10 @@ const HERO_SLIDES = [
 export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(true);
 
   // Quick reservation state
-  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().split("T")[0]);
-  const [checkOut, setCheckOut] = useState(
-    () => new Date(Date.now() + 86400000).toISOString().split("T")[0],
-  );
+  const [checkIn, setCheckIn] = useState(todayIso);
+  const [checkOut, setCheckOut] = useState(() => isoPlusDays(1));
   const [guests, setGuests] = useState(2);
   const [roomType, setRoomType] = useState(rooms[0]?.name ?? "");
 
@@ -66,14 +64,18 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
         {HERO_SLIDES.map((slide, index) => (
           <div
             key={slide.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-              index === currentSlide ? "opacity-100 scale-105 transition-transform duration-[10000ms]" : "opacity-0 scale-100 pointer-events-none"
+            aria-hidden={index !== currentSlide}
+            className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
+              index === currentSlide ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
             <img
+              key={`${slide.id}-${index === currentSlide ? currentSlide : "idle"}`}
               src={slide.image}
               alt={slide.heading}
-              className="w-full h-full object-cover filter brightness-[0.68] contrast-[1.08]"
+              className={`w-full h-full object-cover filter brightness-[0.68] contrast-[1.08] ${
+                index === currentSlide ? "animate-ken-burns" : "scale-[1.06]"
+              }`}
             />
             {/* Gradient Overlays for Readability & Depth */}
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b131b] via-[#0b131b]/40 to-black/60" />
@@ -89,33 +91,34 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
           <span className="tracking-wider uppercase text-[11px] font-medium text-slate-200">Dal Lake • Srinagar, Kashmir</span>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className="p-2 bg-black/40 backdrop-blur-md rounded-full border border-amber-500/20 text-amber-200 hover:text-white transition-colors"
-            title={isMuted ? "Unmute Ambient Sound" : "Mute Sound"}
-          >
-            {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-          </button>
-
-          <button
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="p-2 bg-black/40 backdrop-blur-md rounded-full border border-amber-500/20 text-amber-200 hover:text-white transition-colors"
-            title={isPlaying ? "Pause Slideshow" : "Play Slideshow"}
-          >
-            <Play className={`w-3.5 h-3.5 ${isPlaying ? "opacity-70" : "opacity-100 text-[#d4af37]"}`} />
-          </button>
-        </div>
+        <button
+          onClick={() => setIsPlaying(!isPlaying)}
+          aria-pressed={!isPlaying}
+          aria-label={isPlaying ? "Pause the slideshow" : "Play the slideshow"}
+          className="flex items-center gap-2 px-3 py-1.5 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full border border-amber-500/20 text-amber-200 hover:text-white transition-colors cursor-pointer"
+        >
+          {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 text-[#d4af37]" />}
+          <span className="text-[10px] uppercase tracking-widest">
+            {isPlaying ? "Pause" : "Play"}
+          </span>
+        </button>
       </div>
 
       {/* Main Hero Content */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 text-center my-auto py-12">
-        <div className="inline-flex items-center space-x-2 px-4 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs tracking-[0.3em] uppercase mb-6 animate-pulse">
+        <div
+          key={`tagline-${currentSlide}`}
+          className="animate-fade-up inline-flex items-center space-x-2 px-4 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs tracking-[0.3em] uppercase mb-6"
+        >
           <Award className="w-3.5 h-3.5 text-[#d4af37]" />
           <span>{HERO_SLIDES[currentSlide].tagline}</span>
         </div>
 
-        <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-light text-white tracking-wide leading-tight mb-6 drop-shadow-2xl">
+        <h1
+          key={`heading-${currentSlide}`}
+          className="animate-fade-up font-serif text-4xl sm:text-6xl md:text-7xl font-light text-white tracking-wide leading-tight mb-6 drop-shadow-2xl"
+          style={{ animationDelay: "80ms" }}
+        >
           {HERO_SLIDES[currentSlide].heading.split(" ").map((word, i) => (
             <span key={i} className={word === "Majesty" || word === "Tranquility" || word === "Imperial" || word === "Fine" ? "gold-text-gradient font-normal italic" : ""}>
               {word}{" "}
@@ -123,7 +126,11 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
           ))}
         </h1>
 
-        <p className="max-w-2xl mx-auto text-sm sm:text-base text-slate-300 font-light tracking-widest leading-relaxed mb-8 drop-shadow-md">
+        <p
+          key={`subtext-${currentSlide}`}
+          className="animate-fade-up max-w-2xl mx-auto text-sm sm:text-base text-slate-300 font-light tracking-widest leading-relaxed mb-8 drop-shadow-md"
+          style={{ animationDelay: "160ms" }}
+        >
           {HERO_SLIDES[currentSlide].subtext}
         </p>
 
@@ -131,7 +138,7 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={() => onOpenBooking()}
-            className="w-full sm:w-auto px-8 py-3.5 text-xs uppercase tracking-[0.25em] font-semibold text-[#1c1b1a] bg-[#e6d7c3] hover:bg-[#d9c3a3] rounded-full shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-8 py-3.5 text-xs uppercase tracking-[0.25em] font-semibold text-[#1c1b1a] bg-[#e6d7c3] hover:bg-[#d9c3a3] rounded-full shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2 sheen"
           >
             <span>Book Your Room</span>
             <ChevronRight className="w-4 h-4 text-[#1c1b1a]" />

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Camera, X, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
+import Reveal from "./Reveal";
 
 type GalleryImage = {
   src: string;
@@ -86,7 +87,7 @@ export default function GallerySection() {
     <section id="gallery" className="py-24 bg-[#f9f8f5] text-[#1c1b1a] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-12">
+        <Reveal className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center space-x-2 text-xs uppercase tracking-[0.3em] text-[#a88956] font-semibold mb-3">
             <Camera className="w-3.5 h-3.5" />
             <span>GALLERY</span>
@@ -97,7 +98,7 @@ export default function GallerySection() {
           <p className="text-[#5a5854] text-sm font-light tracking-wide mt-4">
             A look inside Hotel Samci Riviera — our rooms and suites, en-suite bathrooms, reception lobby, and conference spaces in the heart of Srinagar.
           </p>
-        </div>
+        </Reveal>
 
         {/* Filters */}
         <div className="flex items-center justify-center space-x-3 mb-10 flex-wrap gap-y-2">
@@ -123,19 +124,19 @@ export default function GallerySection() {
         {/* Gallery Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredImages.map((img, idx) => (
+            <Reveal key={img.src} delay={(idx % 3) * 90}>
             <button
-              key={img.src}
               type="button"
               onClick={() => setLightboxIndex(idx)}
               aria-label={`View ${img.title} full size`}
-              className="relative h-72 rounded-xl overflow-hidden border border-[#e5e0d8] shadow-sm hover:shadow-md group cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#a88956] focus-visible:ring-offset-2"
+              className="relative w-full h-72 rounded-xl overflow-hidden border border-[#e5e0d8] shadow-sm group cursor-pointer text-left hover-lift"
             >
               <Image
                 src={img.src}
                 alt={img.title}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                className="object-cover group-hover:scale-110 transition-transform duration-700"
+                className="object-cover group-hover:scale-[1.12] transition-transform duration-[900ms] ease-out"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5">
                 <span className="text-[10px] uppercase tracking-widest text-[#e6d7c3] font-semibold">
@@ -147,6 +148,7 @@ export default function GallerySection() {
                 </h3>
               </div>
             </button>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -157,7 +159,7 @@ export default function GallerySection() {
           role="dialog"
           aria-modal="true"
           aria-label={lightboxImage.title}
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in"
         >
           <button
             onClick={() => setLightboxIndex(null)}
@@ -184,7 +186,7 @@ export default function GallerySection() {
           </button>
 
           <div className="max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center">
-            <div className="relative w-full h-[70vh]">
+            <div key={lightboxImage.src} className="relative w-full h-[70vh] animate-scale-in">
               <Image
                 src={lightboxImage.src}
                 alt={lightboxImage.title}

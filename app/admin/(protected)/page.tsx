@@ -4,6 +4,7 @@ import { createClient } from "../../lib/supabase/server";
 import { requireStaff } from "../../lib/auth";
 import type { Booking, Room, RoomStatus } from "../../lib/types";
 import { OCCUPYING_STATUSES, ROOM_STATUS_LABELS } from "../../lib/types";
+import { todayIso, monthStartOf, isoPlusDays } from "../../lib/dates";
 import {
   PageHeader,
   Card,
@@ -33,12 +34,9 @@ export default async function DashboardPage({
   const supabase = await createClient();
 
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
-  const monthStart = today.slice(0, 8) + "01";
-
-  const weekAheadDate = new Date(now);
-  weekAheadDate.setDate(now.getDate() + 7);
-  const weekAhead = weekAheadDate.toISOString().split("T")[0];
+  const today = todayIso();
+  const monthStart = monthStartOf(today);
+  const weekAhead = isoPlusDays(7, now);
 
   const [
     newCount,

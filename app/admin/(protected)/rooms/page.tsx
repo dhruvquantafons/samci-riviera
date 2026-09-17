@@ -5,29 +5,23 @@ import type { Room, RoomType, Booking } from "../../../lib/types";
 import { OCCUPYING_STATUSES, ROOM_STATUS_LABELS } from "../../../lib/types";
 import { updateRoomStatus } from "../../actions";
 import { PageHeader, Card, EmptyState, inputClass, fmtDate } from "../../components/ui";
+import { todayIso, monthStartOf, shiftMonth, monthEndOf } from "../../../lib/dates";
+
+// How far the calendar can be paged in either direction.
+const MONTHS_BACK = 3;
+const MONTHS_FORWARD = 12;
 import AddRoomForm from "./AddRoomForm";
 import AvailabilityCalendar from "./AvailabilityCalendar";
 
-export default async function RoomsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ month?: string }>;
-}) {
+export default async function RoomsPage() {
   await requireStaff();
   const supabase = await createClient();
 
-  // Calendar month to display, defaulting to the current one.
-  const { month } = await searchParams;
-  const today = new Date();
-  const monthStart = /^\d{4}-\d{2}-01$/.test(month ?? "")
-    ? month!
-    : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
-
-  const first = new Date(monthStart + "T00:00:00");
-  const windowStart = monthStart;
-  const windowEnd = new Date(first.getFullYear(), first.getMonth() + 1, 0)
-    .toISOString()
-    .split("T")[0];
+  // Load a wide window of bookings once, so the calendar can page between
+  // months instantly on the client without another round-trip.
+  const thisMonth = monthStartOf(todayIso());
+  const windowStart = shiftMonth(thisMonth, -MONTHS_BACK);
+  const windowEnd = monthEndOf(shiftMonth(thisMonth, MONTHS_FORWARD));
 
   const [{ data: rooms }, { data: roomTypes }, { data: booked }, { data: inHouse }] =
     await Promise.all([
@@ -81,10 +75,11 @@ export default async function RoomsPage({
 
       <div className="space-y-6">
         <AvailabilityCalendar
-          month={monthStart}
           roomTypes={types}
           rooms={roomList}
           bookings={bookings}
+          rangeStart={windowStart}
+          rangeEnd={windowEnd}
         />
 
         <Card className="p-5">

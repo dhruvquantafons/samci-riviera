@@ -59,18 +59,13 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
             <a
               key={link.name}
               href={link.href}
-              className={`text-xs uppercase tracking-[0.2em] transition-colors duration-300 font-medium relative group py-1 ${
+              className={`link-underline text-xs uppercase tracking-[0.2em] transition-colors duration-300 font-medium py-1 ${
                 scrolled
                   ? "text-[#2c2b29] hover:text-[#a88956]"
                   : "text-slate-100 hover:text-amber-200"
               }`}
             >
               {link.name}
-              <span
-                className={`absolute bottom-0 left-0 w-0 h-[1.5px] transition-all duration-300 group-hover:w-full ${
-                  scrolled ? "bg-[#a88956]" : "bg-amber-200"
-                }`}
-              />
             </a>
           ))}
         </nav>
@@ -89,7 +84,7 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
 
           <button
             onClick={() => onOpenBooking()}
-            className="px-6 py-2.5 text-xs uppercase tracking-[0.2em] font-semibold text-[#1c1b1a] transition-all duration-300 rounded-full bg-[#e6d7c3] hover:bg-[#d9c3a3] shadow-md cursor-pointer flex items-center gap-2"
+            className="px-6 py-2.5 text-xs uppercase tracking-[0.2em] font-semibold text-[#1c1b1a] transition-all duration-300 rounded-full bg-[#e6d7c3] hover:bg-[#d9c3a3] shadow-md cursor-pointer flex items-center gap-2 sheen"
           >
             <Calendar className="w-3.5 h-3.5 text-[#1c1b1a]" />
             <span>Book Stay</span>
@@ -116,7 +111,7 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-[#0b131b]/98 backdrop-blur-xl flex flex-col justify-between p-6 md:hidden animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 bg-[#0b131b]/98 backdrop-blur-xl flex flex-col justify-between p-6 md:hidden animate-fade-in">
           <div>
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-amber-500/20">
               <div>
@@ -136,12 +131,13 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
             </div>
 
             <nav className="flex flex-col space-y-5">
-              {navLinks.map((link) => (
+              {navLinks.map((link, i) => (
                 <a
                   key={link.name}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                  className="animate-fade-up font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
                 >
                   {link.name}
                 </a>

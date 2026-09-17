@@ -45,10 +45,6 @@ export default function AccessibilityPage() {
         <p>We are aware of the following and are working on them:</p>
         <ul>
           <li>
-            The homepage hero rotates automatically. A control to pause it has not yet been added, which
-            can be difficult for people who need more time to read.
-          </li>
-          <li>
             Some decorative gold-on-cream label text sits close to the minimum contrast ratio and is being
             reviewed.
           </li>

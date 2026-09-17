@@ -71,6 +71,13 @@ export default function RootLayout({
       lang="en"
       className={`${cormorant.variable} ${plusJakarta.variable} h-full antialiased scroll-smooth`}
     >
+      <head>
+        {/* Scroll reveals start transparent. Without JavaScript nothing would
+            ever reveal them, so force every one visible in that case. */}
+        <noscript>
+          <style>{`.reveal { opacity: 1 !important; transform: none !important; }`}</style>
+        </noscript>
+      </head>
       <body className="min-h-full flex flex-col bg-[#f9f8f5] text-[#1c1b1a] font-sans selection:bg-[#d9c3a3] selection:text-black">
         {children}
       </body>

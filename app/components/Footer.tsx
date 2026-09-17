@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MapPin, Phone, Mail, Award, Send } from "lucide-react";
+import Reveal from "./Reveal";
 import type { RoomType } from "../lib/types";
 
 export default function Footer({ rooms }: { rooms: RoomType[] }) {
@@ -18,22 +19,22 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div className="p-4 bg-[#222120] rounded-xl border border-white/5">
+            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
               <div className="font-serif text-xl text-white font-medium">Condé Nast Traveler</div>
               <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">GOLD LIST 2026</div>
             </div>
 
-            <div className="p-4 bg-[#222120] rounded-xl border border-white/5">
+            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
               <div className="font-serif text-xl text-white font-medium">Forbes Travel Guide</div>
               <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">FIVE-STAR AWARD</div>
             </div>
 
-            <div className="p-4 bg-[#222120] rounded-xl border border-white/5">
+            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
               <div className="font-serif text-xl text-white font-medium">World Luxury Hotels</div>
               <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">BEST PALACE RESORT</div>
             </div>
 
-            <div className="p-4 bg-[#222120] rounded-xl border border-white/5">
+            <div className="hover-lift p-4 bg-[#222120] rounded-xl border border-white/5">
               <div className="font-serif text-xl text-white font-medium">Michelin Guide</div>
               <div className="text-[11px] text-[#e6d7c3] tracking-widest mt-1">3 RED KEYS SELECTION</div>
             </div>
@@ -43,7 +44,7 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
 
       {/* Main Footer Links & Newsletter */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <Reveal className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Brand Info Column */}
           <div className="lg:col-span-4 space-y-4">
             <div>
@@ -136,7 +137,7 @@ export default function Footer({ rooms }: { rooms: RoomType[] }) {
               </p>
             </form>
           </div>
-        </div>
+        </Reveal>
 
         {/* Bottom Copyright */}
         <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">

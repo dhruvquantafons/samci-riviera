@@ -4,10 +4,11 @@ import { useActionState } from "react";
 import type { RoomType } from "../../../../lib/types";
 import { BOOKING_SOURCE_LABELS, BOOKING_STATUS_LABELS } from "../../../../lib/types";
 import { createBooking, type ActionState } from "../../../actions";
+import { todayIso, isoPlusDays } from "../../../../lib/dates";
 import { Field, inputClass, buttonClass, Banner } from "../../../components/ui";
 
-const today = new Date().toISOString().split("T")[0];
-const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+const today = todayIso();
+const tomorrow = isoPlusDays(1);
 
 export default function NewBookingForm({ roomTypes }: { roomTypes: RoomType[] }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(

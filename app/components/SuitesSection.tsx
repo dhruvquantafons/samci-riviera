@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Maximize2, Users, Eye, CheckCircle2, ArrowRight, X, BedDouble, Info } from "lucide-react";
+import Reveal from "./Reveal";
 import type { RoomType, ExtraCharge } from "../lib/types";
 
 /** next/image rejects an empty src, so fall back to a house photograph. */
@@ -53,7 +54,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
       <div id="suites" className="absolute -top-20" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-12">
+        <Reveal className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center space-x-2 text-xs uppercase tracking-[0.3em] text-[#a88956] font-semibold mb-3">
             <BedDouble className="w-3.5 h-3.5" />
             <span>OUR ACCOMMODATIONS</span>
@@ -64,7 +65,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
           <p className="text-[#5a5854] text-sm font-light tracking-wide mt-4">
             Every room at Samci Riviera is a tranquil haven of tasteful Kashmiri woodwork, plush bedding, modern conveniences, and scenic valley views.
           </p>
-        </div>
+        </Reveal>
 
         {/* Tab Filters */}
         <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-12 flex-wrap gap-y-2">
@@ -85,10 +86,11 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
 
         {/* Room Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredRooms.map((room) => (
-            <div
+          {filteredRooms.map((room, index) => (
+            <Reveal
               key={room.id}
-              className="bg-white rounded-xl overflow-hidden border border-[#e5e0d8] hover:border-[#d9c3a3] shadow-sm hover:shadow-md transition-all duration-500 group flex flex-col justify-between"
+              delay={index * 90}
+              className="hover-lift bg-white rounded-xl overflow-hidden border border-[#e5e0d8] hover:border-[#d9c3a3] shadow-sm group flex flex-col justify-between"
             >
               <div>
                 {/* Image Container */}
@@ -98,7 +100,7 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
                     alt={room.name}
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 filter contrast-[1.02]"
+                    className="w-full h-full object-cover group-hover:scale-[1.08] transition-transform duration-[900ms] ease-out filter contrast-[1.02]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
 
@@ -178,12 +180,12 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
                   <ArrowRight className="w-3.5 h-3.5 text-[#1c1b1a]" />
                 </button>
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
 
         {/* Additional Charges Info Panel */}
-        <div className="mt-10 rounded-2xl border border-[#e5e0d8] bg-white shadow-sm overflow-hidden">
+        <Reveal className="mt-10 rounded-2xl border border-[#e5e0d8] bg-white shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-6 py-4 border-b border-[#f0ece5] bg-[#faf9f6]">
             <Info className="w-4 h-4 text-[#a88956] shrink-0" />
             <h4 className="font-serif text-base text-[#1c1b1a] font-medium">Additional Charges &amp; Meal Rates</h4>
@@ -200,12 +202,12 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
           <div className="px-6 py-3 border-t border-[#f0ece5] bg-[#faf9f6]">
             <p className="text-[11px] text-[#7a7771] font-light">* Room rates are quoted on the <strong className="font-medium text-[#5a5854]">CPAI plan</strong> (Continental Plan — accommodation with breakfast) and are inclusive of applicable taxes. Lunch and dinner are charged separately at the buffet rates above. Prices are subject to change during peak season. Contact us for group and corporate rates.</p>
           </div>
-        </div>
+        </Reveal>
       </div>
 
       {/* Room Detail Modal */}
       {selectedModalRoom && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-[#f9f8f5] max-w-2xl w-full rounded-2xl overflow-hidden border border-[#e5e0d8] p-6 relative max-h-[90vh] overflow-y-auto text-[#1c1b1a] shadow-2xl">
             <button
               onClick={() => setSelectedModalRoom(null)}

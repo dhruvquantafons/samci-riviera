@@ -1,6 +1,7 @@
 "use client";
 
 import { Compass, Sunset, Music, Sparkles, ChevronRight } from "lucide-react";
+import Reveal from "./Reveal";
 
 interface ExperiencesSectionProps {
   onOpenBooking: () => void;
@@ -60,16 +61,17 @@ export default function ExperiencesSection({ onOpenBooking }: ExperiencesSection
           {experiences.map((exp, idx) => {
             const IconComp = exp.icon;
             return (
-              <div
+              <Reveal
                 key={idx}
-                className="bg-[#1f1e1d] rounded-xl overflow-hidden border border-white/10 hover:border-[#e6d7c3]/40 transition-all duration-500 group flex flex-col justify-between shadow-2xl hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)]"
+                delay={idx * 90}
+                className="hover-lift bg-[#1f1e1d] rounded-xl overflow-hidden border border-white/10 hover:border-[#e6d7c3]/40 group flex flex-col justify-between shadow-2xl"
               >
                 <div>
                   <div className="relative h-56 overflow-hidden">
                     <img
                       src={exp.image}
                       alt={exp.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 filter brightness-[0.9]"
+                      className="w-full h-full object-cover group-hover:scale-[1.12] transition-transform duration-[900ms] ease-out filter brightness-[0.9]"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#1f1e1d] via-transparent to-black/40" />
 
@@ -98,7 +100,7 @@ export default function ExperiencesSection({ onOpenBooking }: ExperiencesSection
                     <ChevronRight className="w-3.5 h-3.5 text-[#1c1b1a]" />
                   </button>
                 </div>
-              </div>
+              </Reveal>
             );
           })}
         </div>

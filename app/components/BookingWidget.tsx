@@ -16,6 +16,7 @@ import {
   Send,
 } from "lucide-react";
 import type { RoomType } from "../lib/types";
+import { toLocalIso } from "../lib/dates";
 import { submitBookingRequest, type RequestState } from "../lib/booking-request";
 
 interface BookingWidgetProps {
@@ -40,7 +41,8 @@ const fmtDate = (iso: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-const toIso = (d: Date) => d.toISOString().split("T")[0];
+// Local calendar date, not a UTC instant — see app/lib/dates.ts.
+const toIso = toLocalIso;
 
 export default function BookingWidget({
   isOpen,
@@ -150,14 +152,14 @@ export default function BookingWidget({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Full-screen backdrop overlay */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
 
       {/* Booking Popup Card Container */}
       <div
         ref={widgetRef}
-        className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-[0_25px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 fade-in duration-300 border border-[#e5e0d8] my-auto"
+        className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-[0_25px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-panel border border-[#e5e0d8] my-auto"
       >
         {/* ── CARD HEADER with prominent CROSS (X) BUTTON at Top Right ── */}
         <div className="bg-[#1c1b1a] px-6 py-4 flex items-center justify-between border-b border-white/10">
@@ -244,7 +246,7 @@ export default function BookingWidget({
 
               {/* Date Selection Popover */}
               {dateOpen && (
-                <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
+                <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-slide-down">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-[#7a7771] font-semibold block mb-1">
@@ -318,7 +320,7 @@ export default function BookingWidget({
 
               {/* Guests Counter Popover */}
               {guestOpen && (
-                <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
+                <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-slide-down">
                   {renderCounter("Adults", "Age 11+ years", adults, 1, 6, setAdults)}
                   {renderCounter("Children", "Age 5–10 years", children, 0, 4, setChildren)}
                   {renderCounter("Rooms", "Number of rooms required", rooms, 1, 5, setRooms)}
@@ -362,7 +364,7 @@ export default function BookingWidget({
 
               {/* Promo Code Selection */}
               {codeOpen && (
-                <div className="bg-[#faf8f5] border-t border-[#ede9e2] divide-y divide-[#ede9e2] animate-in slide-in-from-top-1 duration-200">
+                <div className="bg-[#faf8f5] border-t border-[#ede9e2] divide-y divide-[#ede9e2] animate-slide-down">
                   {SPECIAL_CODES.map((opt) => (
                     <button
                       key={opt.value}

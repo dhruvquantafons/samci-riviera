@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Reveal from "./Reveal";
 import { Sparkles, MapPin, BedDouble, Utensils, Building2, ArrowUpRight } from "lucide-react";
 
 export default function WelcomeSection() {
@@ -32,7 +33,7 @@ export default function WelcomeSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left Visual Column */}
-          <div className="lg:col-span-6 relative">
+          <Reveal className="lg:col-span-6 relative">
             <div className="relative rounded-xl overflow-hidden border border-[#e5e0d8] shadow-xl group">
               <Image
                 src="/gallery/1.jpg"
@@ -70,10 +71,10 @@ export default function WelcomeSection() {
                 className="w-full h-full object-cover"
               />
             </div>
-          </div>
+          </Reveal>
 
           {/* Right Text Content Column */}
-          <div className="lg:col-span-6 space-y-6">
+          <Reveal delay={120} className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center space-x-2 text-xs uppercase tracking-[0.3em] text-[#a88956] font-semibold">
               <span className="w-8 h-[1px] bg-[#a88956]" />
               <span>ABOUT THE HOTEL</span>
@@ -124,7 +125,7 @@ export default function WelcomeSection() {
                 <ArrowUpRight className="w-4 h-4 text-[#a88956] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </a>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

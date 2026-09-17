@@ -93,3 +93,171 @@
   animation: pulseGlow 3s ease-in-out infinite;
 }
 
+
+/* ===========================================================================
+   Motion
+   Real keyframes, defined here rather than via a plugin. Everything below is
+   disabled wholesale for visitors who ask for reduced motion — see the media
+   query at the end of this file.
+   =========================================================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUpPanel {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Slow drift across a hero photograph, so a still image feels alive. */
+@keyframes kenBurns {
+  from { transform: scale(1.06) translate3d(0, 0, 0); }
+  to   { transform: scale(1.16) translate3d(-1.2%, -1.2%, 0); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+.animate-fade-in    { animation: fadeIn 0.5s ease-out both; }
+.animate-fade-up    { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-scale-in   { animation: scaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-down { animation: slideDown 0.3s ease-out both; }
+.animate-panel      { animation: slideUpPanel 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-ken-burns  { animation: kenBurns 14s ease-out both; }
+
+/* ---------------------------------------------------------------------------
+   Scroll reveal
+   Elements start hidden and transition in when the Reveal component marks them
+   visible. Kept as a transition (not an animation) so it cannot re-trigger.
+   --------------------------------------------------------------------------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.reveal[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Micro-interactions
+   --------------------------------------------------------------------------- */
+
+/* Gold underline that grows from the left on hover. */
+.link-underline {
+  position: relative;
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 0;
+  background: currentColor;
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.link-underline:hover::after,
+.link-underline:focus-visible::after {
+  width: 100%;
+}
+
+/* Cards that rise slightly under the cursor. */
+.hover-lift {
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.45s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px -18px rgba(28, 27, 26, 0.3);
+}
+
+/* A slow sheen that crosses a button on hover. */
+.sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sheen:hover::before {
+  transform: translateX(120%);
+}
+
+/* Shared shimmer for any loading placeholder. */
+.shimmer {
+  background: linear-gradient(90deg, #ece8e1 25%, #f6f3ee 50%, #ece8e1 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Consistent, visible keyboard focus across the site. */
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid #a88956;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+   Respect the visitor's motion preference.
+   The accessibility statement promises this, so it is a hard switch: reveals
+   resolve to their finished state and every animation is reduced to a no-op.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Utensils, Clock, Sparkles, Award, Coffee, Maximize2, X, ChevronRight, Calendar } from "lucide-react";
+import Reveal from "./Reveal";
 
 interface DiningSectionProps {
   onOpenBooking: () => void;
@@ -65,9 +66,10 @@ export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
         {/* Photo / Card Grid (Gallery Style) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {venues.map((venue, idx) => (
-            <div
+            <Reveal
               key={idx}
-              className="bg-[#222120] rounded-xl overflow-hidden border border-white/10 hover:border-[#e6d7c3]/40 transition-all duration-500 group flex flex-col justify-between shadow-2xl hover:shadow-[0_12px_35px_rgba(0,0,0,0.6)]"
+              delay={idx * 110}
+              className="hover-lift bg-[#222120] rounded-xl overflow-hidden border border-white/10 hover:border-[#e6d7c3]/40 group flex flex-col justify-between shadow-2xl"
             >
               <div>
                 {/* Photo Header */}
@@ -166,7 +168,7 @@ export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
                   <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
 
@@ -191,7 +193,7 @@ export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
 
       {/* Culinary Detail Modal / Lightbox */}
       {selectedModalVenue && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-[#1f1e1d] border border-white/15 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative shadow-2xl">
             <button
               onClick={() => setSelectedModalVenue(null)}
