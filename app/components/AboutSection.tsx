@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import Reveal from "./Reveal";
 import {
   Sparkles,
@@ -100,16 +101,6 @@ export default function AboutSection() {
 
           {/* Right Text Content Column */}
           <Reveal delay={120} className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center space-x-2 text-xs uppercase tracking-[0.3em] text-[#a88956] font-semibold">
-              <span className="w-8 h-[1px] bg-[#a88956]" />
-              <span>ABOUT US</span>
-            </div>
-
-            <h2 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-light text-[#1c1b1a] leading-tight">
-              A Prime Location{" "}
-              <span className="italic text-[#a88956] font-normal">in the Valley</span>
-            </h2>
-
             <p className="text-[#5a5854] text-sm sm:text-base font-light leading-relaxed tracking-wide">
               Hotel Samci Riviera is situated at a prime location in the valley of
               Kashmir — suited to leisure and corporate travellers alike, and an ideal
@@ -175,13 +166,13 @@ export default function AboutSection() {
 
             {/* Action link */}
             <div className="pt-2">
-              <a
-                href="#rooms"
+              <Link
+                href="/rooms"
                 className="inline-flex items-center space-x-2 text-xs uppercase tracking-[0.2em] text-[#1c1b1a] hover:text-[#a88956] transition-colors group font-semibold"
               >
                 <span>Explore Our Rooms</span>
                 <ArrowUpRight className="w-4 h-4 text-[#a88956] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </a>
+              </Link>
             </div>
           </Reveal>
         </div>

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Phone, Menu, X, Calendar } from "lucide-react";
+import { useBooking } from "./SiteShell";
 
-interface NavbarProps {
-  onOpenBooking: (suiteName?: string) => void;
-}
-
-export default function Navbar({ onOpenBooking }: NavbarProps) {
+export default function Navbar() {
+  const { openBooking } = useBooking();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const isActive = (href: string) => pathname === href;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,9 +40,10 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
   }, [mobileMenuOpen]);
 
   const navLinks = [
-    { name: "Rooms", href: "#rooms" },
-    { name: "Dining", href: "#dining" },
-    { name: "About", href: "#about" },
+    { name: "Rooms", href: "/rooms" },
+    { name: "Dining", href: "/dining" },
+    { name: "Gallery", href: "/gallery" },
+    { name: "About", href: "/about" },
   ];
 
   return (
@@ -54,7 +57,7 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
         {/* Brand Logo */}
-        <a href="#" className="group flex flex-col items-start focus:outline-none">
+        <Link href="/" className="group flex flex-col items-start focus:outline-none">
           <span
             className={`font-serif text-lg sm:text-2xl lg:text-3xl font-bold tracking-[0.12em] sm:tracking-[0.2em] uppercase whitespace-nowrap group-hover:opacity-80 transition-all duration-300 ${
               scrolled ? "text-[#1c1b1a]" : "text-white"
@@ -69,22 +72,27 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
           >
             HOTEL &bull; SRINAGAR
           </span>
-        </a>
+        </Link>
 
         {/* Center Nav Links */}
         <nav className="hidden md:flex items-center space-x-8">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.name}
               href={link.href}
+              aria-current={isActive(link.href) ? "page" : undefined}
               className={`link-underline text-xs uppercase tracking-[0.2em] transition-colors duration-300 font-medium py-1 ${
-                scrolled
-                  ? "text-[#2c2b29] hover:text-[#a88956]"
-                  : "text-slate-100 hover:text-amber-200"
+                isActive(link.href)
+                  ? scrolled
+                    ? "text-[#a88956]"
+                    : "text-amber-200"
+                  : scrolled
+                    ? "text-[#2c2b29] hover:text-[#a88956]"
+                    : "text-slate-100 hover:text-amber-200"
               }`}
             >
               {link.name}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -101,7 +109,7 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
           </a>
 
           <button
-            onClick={() => onOpenBooking()}
+            onClick={() => openBooking()}
             className="px-6 py-2.5 text-xs uppercase tracking-[0.2em] font-semibold text-[#1c1b1a] transition-all duration-300 rounded-full bg-[#e6d7c3] hover:bg-[#d9c3a3] shadow-md cursor-pointer flex items-center gap-2 sheen"
           >
             <Calendar className="w-3.5 h-3.5 text-[#1c1b1a]" />
@@ -112,7 +120,7 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
         {/* Mobile Menu Trigger */}
         <div className="flex md:hidden items-center space-x-3">
           <button
-            onClick={() => onOpenBooking()}
+            onClick={() => openBooking()}
             className="px-3.5 py-1.5 text-[10px] uppercase tracking-widest font-semibold text-[#1c1b1a] bg-[#e6d7c3] rounded-full"
           >
             Book
@@ -158,23 +166,21 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
 
           <nav className="flex flex-col space-y-5">
             {navLinks.map((link, i) => (
-              <a
+              <Link
                 key={link.name}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
+                aria-current={isActive(link.href) ? "page" : undefined}
                 style={{ animationDelay: `${i * 60}ms` }}
-                className="animate-fade-up font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
+                className={`animate-fade-up font-serif text-xl tracking-wider transition-colors border-b border-white/5 pb-2 ${
+                  isActive(link.href)
+                    ? "text-[#d4af37]"
+                    : "text-slate-200 hover:text-[#d4af37]"
+                }`}
               >
                 {link.name}
-              </a>
+              </Link>
             ))}
-            <a
-              href="#gallery"
-              onClick={() => setMobileMenuOpen(false)}
-              className="font-serif text-xl text-slate-200 hover:text-[#d4af37] tracking-wider transition-colors border-b border-white/5 pb-2"
-            >
-              Gallery
-            </a>
           </nav>
         </div>
 
@@ -189,7 +195,7 @@ export default function Navbar({ onOpenBooking }: NavbarProps) {
           <button
             onClick={() => {
               setMobileMenuOpen(false);
-              onOpenBooking();
+              openBooking();
             }}
             className="w-full py-3.5 text-xs uppercase tracking-[0.2em] font-semibold text-black bg-gradient-to-r from-[#f3e5ab] via-[#d4af37] to-[#aa771c] rounded-sm text-center shadow-lg cursor-pointer"
           >

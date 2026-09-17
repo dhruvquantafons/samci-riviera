@@ -3,10 +3,7 @@
 import Image from "next/image";
 import { UtensilsCrossed, Coffee, Clock } from "lucide-react";
 import Reveal from "./Reveal";
-
-interface DiningSectionProps {
-  onOpenBooking: (roomName?: string) => void;
-}
+import { useBooking } from "./SiteShell";
 
 const FACTS = [
   { icon: UtensilsCrossed, label: "Kashmiri Wazwan & multi-cuisine" },
@@ -14,7 +11,8 @@ const FACTS = [
   { icon: Clock, label: "In-room dining around the clock" },
 ];
 
-export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
+export default function DiningSection() {
+  const { openBooking } = useBooking();
   return (
     <section id="dining" className="py-14 sm:py-20 bg-[#141312] text-slate-200">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -33,15 +31,6 @@ export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
 
           {/* Copy */}
           <div className="space-y-5">
-            <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-[#e6d7c3] font-semibold">
-              <UtensilsCrossed className="w-3.5 h-3.5" />
-              <span>Dining</span>
-            </div>
-
-            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-light text-white leading-tight">
-              Samci Restaurant
-            </h2>
-
             <p className="text-sm text-slate-400 font-light leading-relaxed max-w-md">
               Traditional Kashmiri Wazwan alongside familiar international dishes,
               served through the day.
@@ -57,7 +46,7 @@ export default function DiningSection({ onOpenBooking }: DiningSectionProps) {
             </ul>
 
             <button
-              onClick={() => onOpenBooking()}
+              onClick={() => openBooking()}
               className="mt-2 px-6 py-3 text-xs uppercase tracking-[0.2em] font-semibold text-[#1c1b1a] bg-[#e6d7c3] hover:bg-[#d9c3a3] rounded-full transition-colors cursor-pointer sheen"
             >
               Enquire about a table

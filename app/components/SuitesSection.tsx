@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Maximize2, Users, Eye, CheckCircle2, ArrowRight, X, BedDouble, Info } from "lucide-react";
+import { Maximize2, Users, Eye, CheckCircle2, ArrowRight, X, Info } from "lucide-react";
 import Reveal from "./Reveal";
 import type { RoomType, ExtraCharge } from "../lib/types";
+import { useBooking } from "./SiteShell";
 
 /** next/image rejects an empty src, so fall back to a house photograph. */
 const PLACEHOLDER_IMAGE = "/gallery/2.jpg";
@@ -29,12 +30,12 @@ function categoryLabel(category: string) {
 }
 
 interface SuitesSectionProps {
-  onOpenBooking: (roomName?: string) => void;
   rooms: RoomType[];
   charges: ExtraCharge[];
 }
 
-export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesSectionProps) {
+export default function SuitesSection({ rooms, charges }: SuitesSectionProps) {
+  const { openBooking } = useBooking();
   const [activeTab, setActiveTab] = useState<string>("all");
   const [selectedModalRoom, setSelectedModalRoom] = useState<RoomType | null>(null);
 
@@ -54,18 +55,6 @@ export default function SuitesSection({ onOpenBooking, rooms, charges }: SuitesS
       <div id="suites" className="absolute -top-20" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <Reveal className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center space-x-2 text-xs uppercase tracking-[0.3em] text-[#a88956] font-semibold mb-3">
-            <BedDouble className="w-3.5 h-3.5" />
-            <span>OUR ACCOMMODATIONS</span>
-          </div>
-          <h2 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-light text-[#1c1b1a] leading-tight">
-            Refined Rooms, <span className="italic text-[#a88956] font-normal">Thoughtfully Designed</span>
-          </h2>
-          <p className="text-[#5a5854] text-sm font-light tracking-wide mt-4">
-Kashmiri woodwork, plush bedding, and valley views.
-          </p>
-        </Reveal>
 
         {/* Tab Filters */}
         <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-12 flex-wrap gap-y-2">
@@ -173,7 +162,7 @@ Kashmiri woodwork, plush bedding, and valley views.
                 </button>
 
                 <button
-                  onClick={() => onOpenBooking(room.name)}
+                  onClick={() => openBooking(room.name)}
                   className="px-5 py-2.5 bg-[#e6d7c3] hover:bg-[#d9c3a3] text-[#1c1b1a] font-semibold text-xs uppercase tracking-widest rounded-full flex items-center space-x-2 shadow-sm cursor-pointer"
                 >
                   <span>Book Room</span>
@@ -261,7 +250,7 @@ Kashmiri woodwork, plush bedding, and valley views.
                   onClick={() => {
                     const name = selectedModalRoom.name;
                     setSelectedModalRoom(null);
-                    onOpenBooking(name);
+                    openBooking(name);
                   }}
                   className="px-6 py-3 bg-[#e6d7c3] hover:bg-[#d9c3a3] text-[#1c1b1a] font-semibold text-xs uppercase tracking-widest rounded-full shadow-md cursor-pointer"
                 >

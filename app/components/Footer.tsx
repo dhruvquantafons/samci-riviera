@@ -50,12 +50,12 @@ Warm Kashmiri hospitality on the bank of the Jhelum, 1.5 km from Dal Lake.
             <ul className="space-y-2 text-xs">
               {rooms.map((room) => (
                 <li key={room.id}>
-                  <a href="#rooms" className="hover:text-[#e6d7c3] transition-colors">
+                  <Link href="/rooms" className="hover:text-[#e6d7c3] transition-colors">
                     {room.name} – ₹{Number(room.base_rate).toLocaleString("en-IN")}/night
-                  </a>
+                  </Link>
                 </li>
               ))}
-              <li><a href="#rooms" className="hover:text-[#e6d7c3] transition-colors">All Accommodations</a></li>
+              <li><Link href="/rooms" className="hover:text-[#e6d7c3] transition-colors">All Accommodations</Link></li>
             </ul>
           </div>
 
@@ -65,9 +65,9 @@ Warm Kashmiri hospitality on the bank of the Jhelum, 1.5 km from Dal Lake.
               Hotel
             </h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#dining" className="hover:text-[#e6d7c3] transition-colors">Samci Restaurant</a></li>
-              <li><a href="#gallery" className="hover:text-[#e6d7c3] transition-colors">Photo Gallery</a></li>
-              <li><a href="#about" className="hover:text-[#e6d7c3] transition-colors">Conference &amp; Events</a></li>
+              <li><Link href="/dining" className="hover:text-[#e6d7c3] transition-colors">Samci Restaurant</Link></li>
+              <li><Link href="/gallery" className="hover:text-[#e6d7c3] transition-colors">Photo Gallery</Link></li>
+              <li><Link href="/about" className="hover:text-[#e6d7c3] transition-colors">Conference &amp; Events</Link></li>
             </ul>
           </div>
 

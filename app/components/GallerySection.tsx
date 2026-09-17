@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Camera, X, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
 import Reveal from "./Reveal";
 
 type GalleryImage = {
@@ -87,18 +87,6 @@ export default function GallerySection() {
     <section id="gallery" className="py-14 sm:py-24 bg-[#f9f8f5] text-[#1c1b1a] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <Reveal className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center space-x-2 text-xs uppercase tracking-[0.3em] text-[#a88956] font-semibold mb-3">
-            <Camera className="w-3.5 h-3.5" />
-            <span>GALLERY</span>
-          </div>
-          <h2 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-light text-[#1c1b1a] leading-tight">
-            Moments Worth <span className="italic text-[#a88956] font-normal">Remembering</span>
-          </h2>
-          <p className="text-[#5a5854] text-sm font-light tracking-wide mt-4">
-A look inside the hotel.
-          </p>
-        </Reveal>
 
         {/* Filters */}
         <div className="flex items-center justify-center space-x-3 mb-10 flex-wrap gap-y-2">

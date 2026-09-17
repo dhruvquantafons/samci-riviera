@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, Users, ChevronRight, Sparkles, MapPin, Award } from "lucide-react";
+import Link from "next/link";
 import type { RoomType } from "../lib/types";
 import { todayIso, isoPlusDays } from "../lib/dates";
+import { useBooking } from "./SiteShell";
 
 interface HeroSectionProps {
-  onOpenBooking: (roomName?: string) => void;
   rooms: RoomType[];
 }
 
@@ -34,7 +35,8 @@ const HERO_SLIDES = [
   },
 ];
 
-export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) {
+export default function HeroSection({ rooms }: HeroSectionProps) {
+  const { openBooking } = useBooking();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [paused, setPaused] = useState(false);
   const [takenOver, setTakenOver] = useState(false);
@@ -59,7 +61,7 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
 
   const handleQuickBook = (e: React.FormEvent) => {
     e.preventDefault();
-    onOpenBooking(roomType);
+    openBooking(roomType);
   };
 
   return (
@@ -136,19 +138,19 @@ export default function HeroSection({ onOpenBooking, rooms }: HeroSectionProps) 
         {/* Action Buttons */}
         <div className="flex flex-row items-stretch justify-center gap-2.5 sm:gap-4">
           <button
-            onClick={() => onOpenBooking()}
+            onClick={() => openBooking()}
             className="flex-1 sm:flex-initial px-4 sm:px-8 py-3 sm:py-3.5 text-[10px] sm:text-xs uppercase tracking-[0.12em] sm:tracking-[0.25em] font-semibold text-[#1c1b1a] bg-[#e6d7c3] hover:bg-[#d9c3a3] rounded-full shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 sheen"
           >
             <span>Book Your Room</span>
             <ChevronRight className="w-4 h-4 text-[#1c1b1a]" />
           </button>
 
-          <a
-            href="#rooms"
+          <Link
+            href="/rooms"
             className="flex-1 sm:flex-initial px-4 sm:px-8 py-3 sm:py-3.5 text-[10px] sm:text-xs uppercase tracking-[0.12em] sm:tracking-[0.25em] font-medium text-white hover:text-amber-100 bg-black/30 hover:bg-black/50 border border-white/30 rounded-full backdrop-blur-md transition-all flex items-center justify-center gap-2"
           >
             <span>View All Rooms</span>
-          </a>
+          </Link>
         </div>
 
         {/* Slide Indicators */}
