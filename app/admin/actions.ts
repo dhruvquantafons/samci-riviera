@@ -281,7 +281,10 @@ export async function createRoomType(
 
   revalidatePath("/admin/rates");
   revalidatePath("/admin/rooms");
-  revalidatePath("/");
+  // Rates and photography appear on several public pages, all statically
+  // rendered. Revalidating the root layout refreshes every one of them;
+  // revalidating "/" alone would leave /rooms serving a stale page.
+  revalidatePath("/", "layout");
   return {
     success: `${name} created. Add a photo below, and it will appear on the website.`,
   };
@@ -323,7 +326,10 @@ export async function deleteRoomType(
   if (error) return { error: error.message };
 
   revalidatePath("/admin/rates");
-  revalidatePath("/");
+  // Rates and photography appear on several public pages, all statically
+  // rendered. Revalidating the root layout refreshes every one of them;
+  // revalidating "/" alone would leave /rooms serving a stale page.
+  revalidatePath("/", "layout");
   return { success: "Room type deleted." };
 }
 
@@ -356,7 +362,10 @@ export async function updateRoomType(
   if (error) return { error: error.message };
 
   revalidatePath("/admin/rates");
-  revalidatePath("/");
+  // Rates and photography appear on several public pages, all statically
+  // rendered. Revalidating the root layout refreshes every one of them;
+  // revalidating "/" alone would leave /rooms serving a stale page.
+  revalidatePath("/", "layout");
   return { success: "Rate updated. The public site now shows the new price." };
 }
 
@@ -378,7 +387,10 @@ export async function updateExtraCharge(
   if (error) return { error: error.message };
 
   revalidatePath("/admin/rates");
-  revalidatePath("/");
+  // Rates and photography appear on several public pages, all statically
+  // rendered. Revalidating the root layout refreshes every one of them;
+  // revalidating "/" alone would leave /rooms serving a stale page.
+  revalidatePath("/", "layout");
   return { success: "Charge updated." };
 }
 
@@ -456,7 +468,10 @@ export async function uploadRoomPhoto(
   }
 
   revalidatePath("/admin/rates");
-  revalidatePath("/");
+  // Rates and photography appear on several public pages, all statically
+  // rendered. Revalidating the root layout refreshes every one of them;
+  // revalidating "/" alone would leave /rooms serving a stale page.
+  revalidatePath("/", "layout");
   return { success: "Photo updated. The website now shows the new image." };
 }
 

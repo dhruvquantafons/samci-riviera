@@ -1,4 +1,14 @@
 import { getPublicRates } from "../lib/rates";
+
+/**
+ * Safety net for the public pages.
+ *
+ * Edits made through the admin panel call revalidatePath and appear at once.
+ * A change made straight in the Supabase dashboard runs none of our code, so
+ * without this the statically rendered pages would serve stale rates and
+ * photographs indefinitely. Five minutes keeps them honest.
+ */
+export const revalidate = 300;
 import SiteShell from "../components/SiteShell";
 
 /**
