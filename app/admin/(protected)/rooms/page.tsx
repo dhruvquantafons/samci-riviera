@@ -6,6 +6,7 @@ import { OCCUPYING_STATUSES, ROOM_STATUS_LABELS } from "../../../lib/types";
 import { updateRoomStatus } from "../../actions";
 import { PageHeader, Card, EmptyState, inputClass, fmtDate } from "../../components/ui";
 import { todayIso, monthStartOf, shiftMonth, monthEndOf } from "../../../lib/dates";
+import { canManageRates } from "../../../lib/types";
 
 // How far the calendar can be paged in either direction.
 const MONTHS_BACK = 3;
@@ -14,7 +15,7 @@ import AddRoomForm from "./AddRoomForm";
 import AvailabilityCalendar from "./AvailabilityCalendar";
 
 export default async function RoomsPage() {
-  await requireStaff();
+  const staff = await requireStaff();
   const supabase = await createClient();
 
   // Load a wide window of bookings once, so the calendar can page between
@@ -82,10 +83,12 @@ export default async function RoomsPage() {
           rangeEnd={windowEnd}
         />
 
-        <Card className="p-5">
-          <h2 className="font-serif text-lg text-[#1c1b1a] font-medium mb-4">Add a room</h2>
-          <AddRoomForm roomTypes={types} />
-        </Card>
+        {canManageRates(staff.role) && (
+          <Card className="p-5">
+            <h2 className="font-serif text-lg text-[#1c1b1a] font-medium mb-4">Add a room</h2>
+            <AddRoomForm roomTypes={types} />
+          </Card>
+        )}
 
         <Card>
           <h2 className="font-serif text-lg text-[#1c1b1a] font-medium px-5 py-4 border-b border-[#f0ece5]">

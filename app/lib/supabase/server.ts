@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 /**
@@ -58,4 +59,22 @@ export function createPublicClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll: () => [], setAll: () => {} } },
   );
+}
+
+/**
+ * Admin client for privileged auth operations — creating a staff login,
+ * resetting a password, deleting an account.
+ *
+ * Uses supabase-js directly rather than the SSR helper, because the
+ * `auth.admin` API expects a plain client with no session handling. Holds the
+ * service role key, so it must never be imported into a Client Component, and
+ * every caller re-checks that the requester is an administrator.
+ */
+export function createAdminClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
+
+  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }

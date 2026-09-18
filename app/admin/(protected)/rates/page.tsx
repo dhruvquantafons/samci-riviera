@@ -1,5 +1,5 @@
 import { createClient } from "../../../lib/supabase/server";
-import { requireAdmin } from "../../../lib/auth";
+import { requireRatesAccess } from "../../../lib/auth";
 import type { RoomType, ExtraCharge } from "../../../lib/types";
 import { PageHeader, Card } from "../../components/ui";
 import RoomTypeForm from "./RoomTypeForm";
@@ -9,7 +9,7 @@ import DeleteRoomTypeForm from "./DeleteRoomTypeForm";
 import ExtraChargeForm from "./ExtraChargeForm";
 
 export default async function RatesPage() {
-  await requireAdmin();
+  await requireRatesAccess();
   const supabase = await createClient();
 
   const [{ data: roomTypes }, { data: charges }] = await Promise.all([

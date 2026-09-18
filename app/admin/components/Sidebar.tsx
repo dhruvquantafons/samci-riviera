@@ -14,21 +14,30 @@ import {
   X,
 } from "lucide-react";
 import type { Staff } from "../../lib/types";
+import { canManageStaff, canManageRates, canManageBookings, STAFF_ROLE_LABELS } from "../../lib/types";
 import { signOut } from "../actions";
 
-const NAV = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
-  { href: "/admin/rooms", label: "Rooms", icon: BedDouble },
-  { href: "/admin/rates", label: "Rates", icon: IndianRupee, adminOnly: true },
-  { href: "/admin/staff", label: "Staff", icon: UserCog, adminOnly: true },
+import type { StaffRole } from "../../lib/types";
+
+const NAV: {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  allowed: (role: StaffRole) => boolean;
+}[] = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, allowed: () => true },
+  { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck, allowed: canManageBookings },
+  { href: "/admin/rooms", label: "Rooms", icon: BedDouble, allowed: () => true },
+  { href: "/admin/rates", label: "Rates", icon: IndianRupee, allowed: canManageRates },
+  { href: "/admin/staff", label: "Staff", icon: UserCog, allowed: canManageStaff },
 ];
 
 export default function Sidebar({ staff }: { staff: Staff }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const links = NAV.filter((item) => !item.adminOnly || staff.role === "admin");
+  const links = NAV.filter((item) => item.allowed(staff.role));
 
   const nav = (
     <nav className="space-y-1">
@@ -60,8 +69,9 @@ export default function Sidebar({ staff }: { staff: Staff }) {
         <p className="text-sm text-white font-medium truncate">
           {staff.full_name || staff.email}
         </p>
-        <p className="text-[11px] text-[#9a9490] capitalize">
-          {staff.role.replace("_", " ")}
+        <p className="text-[11px] text-[#9a9490]">
+          {STAFF_ROLE_LABELS[staff.role]}
+          {staff.job_title ? ` · ${staff.job_title}` : ""}
         </p>
       </div>
       <form action={signOut}>

@@ -36,11 +36,13 @@ The admin panel at `/admin` needs a Supabase project.
    `0001_init.sql` (schema, RLS policies, tariff seed), `0002_room_photos.sql`
    (storage bucket for room photography), then
    `0003_room_status_and_staff.sql` (room occupancy triggers, staff details).
+   Then `0004_staff_roles.sql` (manager and housekeeping roles).
 3. Copy the URL, anon key, and service role key from **Project Settings → API**
    into `.env.local` (see `.env.example`).
-4. Add your first user under **Authentication → Users**. The first account
-   created automatically becomes an administrator; everyone after defaults to
-   front desk and can be promoted from **Staff** inside the panel.
+4. Add your **first** user under **Authentication → Users**, ticking "Auto
+   Confirm User". That first account automatically becomes an administrator.
+   Everyone after that is created from **Staff** inside the panel — the
+   Supabase dashboard is not needed again.
 
 On Vercel, set the same three variables under **Settings → Environment
 Variables**. `SUPABASE_SERVICE_ROLE_KEY` bypasses row level security — keep it
@@ -131,22 +133,37 @@ are not duplicated — but there is no UI for browsing it.
 
 ## Roles
 
-| | Front desk | Administrator |
-|---|---|---|
-| Bookings and rooms | ✅ | ✅ |
-| Edit rates and room photos | — | ✅ |
-| Manage staff details and roles | — | ✅ |
+A role is a permission tier. Someone's actual job — Waiter, Head Chef, Night
+Manager — goes in their free-text **job title**, so the tiers stay few and
+meaningful.
 
-Adding a staff member is two steps: create their login in the Supabase
-dashboard under **Authentication → Users**, then fill in their name, job title
-and phone under **Staff** in the panel. They appear there automatically as
-front desk. An administrator cannot change their own role or access, which
-prevents locking the whole team out.
+| | Dashboard | Bookings | Room status | Inventory & rates | Staff accounts |
+|---|---|---|---|---|---|
+| **Administrator** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Manager** | ✅ | ✅ | ✅ | ✅ | — |
+| **Front Desk** | ✅ | ✅ | ✅ | — | — |
+| **Housekeeping** | ✅ | — | ✅ | — | — |
 
-Enforced in three places: `proxy.ts` redirects signed-out traffic, the
-`(protected)` layout re-checks with `requireStaff()`, and every server action
-calls `requireStaff()` or `requireAdmin()` again. Postgres RLS is the final
-backstop, so a missed check in the app still cannot leak data.
+Administrators add staff from **Staff → Add a staff member**: name, job title,
+email, a temporary password and a role. The account is confirmed immediately,
+so there is no invitation email to chase — hand the password over directly.
+Administrators can also set a new password or remove an account from the same
+page. Suspending is usually better than removing, because it keeps the person's
+notes attributed to them.
+
+An administrator cannot change their own role or access, which prevents
+locking the whole team out.
+
+Enforced in four places: `proxy.ts` redirects signed-out traffic, the
+`(protected)` layout re-checks with `requireStaff()`, every server action calls
+the guard for its tier (`requireAdmin`, `requireRatesAccess`,
+`requireBookingsAccess`), and Postgres RLS is the final backstop through
+`is_admin()`, `can_manage_rates()` and `can_manage_bookings()`. A missed check
+in the app still cannot leak data.
+
+Creating, deleting and re-passwording accounts uses the Supabase admin API via
+`createAdminClient()`, which holds the service role key. It is server-only and
+every caller re-checks that the requester is an administrator.
 
 ## Content and sources
 

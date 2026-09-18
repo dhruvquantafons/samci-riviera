@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Mail, Phone, User } from "lucide-react";
 import { createClient } from "../../../../lib/supabase/server";
-import { requireStaff } from "../../../../lib/auth";
+import { requireBookingsAccess } from "../../../../lib/auth";
 import type { Booking, BookingNote, RoomType, Room } from "../../../../lib/types";
 import { BOOKING_SOURCE_LABELS } from "../../../../lib/types";
 import { updateBookingStatus, addBookingNote } from "../../../actions";
@@ -32,7 +32,7 @@ export default async function BookingDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  await requireBookingsAccess();
   const { id } = await params;
   const supabase = await createClient();
 

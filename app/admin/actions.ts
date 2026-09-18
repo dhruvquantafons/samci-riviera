@@ -2,9 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "../lib/supabase/server";
-import { requireStaff, requireAdmin } from "../lib/auth";
-import type { BookingStatus } from "../lib/types";
+import { createClient, createAdminClient } from "../lib/supabase/server";
+import {
+  requireStaff,
+  requireAdmin,
+  requireRatesAccess,
+  requireBookingsAccess,
+} from "../lib/auth";
+import type { BookingStatus, StaffRole } from "../lib/types";
+import { STAFF_ROLES } from "../lib/types";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -22,7 +28,7 @@ export async function createBooking(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const staff = await requireStaff();
+  const staff = await requireBookingsAccess();
   const supabase = await createClient();
 
   const contactName = str(formData, "contact_name");
@@ -87,7 +93,7 @@ export async function createBooking(
 }
 
 export async function updateBookingStatus(formData: FormData) {
-  await requireStaff();
+  await requireBookingsAccess();
   const supabase = await createClient();
   const id = str(formData, "id");
 
@@ -106,7 +112,7 @@ export async function updateBookingDetails(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireStaff();
+  await requireBookingsAccess();
   const supabase = await createClient();
   const id = str(formData, "id");
 
@@ -138,7 +144,7 @@ export async function updateBookingDetails(
 }
 
 export async function addBookingNote(formData: FormData) {
-  const staff = await requireStaff();
+  const staff = await requireBookingsAccess();
   const supabase = await createClient();
 
   const bookingId = str(formData, "booking_id");
@@ -158,7 +164,7 @@ export async function createRoom(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireStaff();
+  await requireRatesAccess();
   const supabase = await createClient();
 
   const roomNumber = str(formData, "room_number");
@@ -196,7 +202,7 @@ export async function updateRoomStatus(formData: FormData) {
 }
 
 export async function deleteRoom(formData: FormData) {
-  await requireAdmin();
+  await requireRatesAccess();
   const supabase = await createClient();
   await supabase.from("rooms").delete().eq("id", str(formData, "id"));
   revalidatePath("/admin/rooms");
@@ -228,7 +234,7 @@ export async function createRoomType(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  await requireRatesAccess();
   const supabase = await createClient();
 
   const name = str(formData, "name");
@@ -290,7 +296,7 @@ export async function deleteRoomType(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  await requireRatesAccess();
   const supabase = await createClient();
   const id = str(formData, "id");
 
@@ -325,7 +331,7 @@ export async function updateRoomType(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  await requireRatesAccess();
   const supabase = await createClient();
 
   const rate = num(formData, "base_rate");
@@ -358,7 +364,7 @@ export async function updateExtraCharge(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  await requireRatesAccess();
   const supabase = await createClient();
 
   const amount = num(formData, "amount");
@@ -393,7 +399,7 @@ export async function uploadRoomPhoto(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  await requireRatesAccess();
 
   const id = str(formData, "id");
   const file = formData.get("photo");
@@ -455,6 +461,121 @@ export async function uploadRoomPhoto(
 }
 
 // ── Staff (admin only) ──────────────────────────────────────────────────────
+
+/**
+ * Creates a login for a new staff member and fills in their details.
+ *
+ * Uses the service-role admin API because creating an auth user is privileged;
+ * requireAdmin() above it means only an administrator can reach this. The
+ * account is confirmed immediately, so the person can sign in with the
+ * password set here and there is no invitation email to chase.
+ */
+export async function createStaffMember(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const email = str(formData, "email").toLowerCase();
+  const password = str(formData, "password");
+  const fullName = str(formData, "full_name");
+  const role = str(formData, "role") as StaffRole;
+
+  if (!fullName) return { error: "Enter the person's name." };
+  if (!email || !email.includes("@")) return { error: "Enter a valid email address." };
+  if (password.length < 8) return { error: "The password must be at least 8 characters." };
+  if (!STAFF_ROLES.includes(role)) return { error: "Choose a role." };
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      error:
+        "SUPABASE_SERVICE_ROLE_KEY is not set, so accounts cannot be created from here.",
+    };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
+
+  if (createError) {
+    const alreadyExists =
+      createError.status === 422 || /already/i.test(createError.message);
+    return {
+      error: alreadyExists
+        ? `An account already exists for ${email}.`
+        : createError.message,
+    };
+  }
+
+  // A database trigger creates the matching staff row; fill in the rest.
+  const { error: detailsError } = await admin
+    .from("staff")
+    .update({
+      full_name: fullName,
+      job_title: str(formData, "job_title"),
+      phone: str(formData, "phone"),
+      role,
+      is_active: true,
+    })
+    .eq("id", created.user.id);
+
+  if (detailsError) return { error: detailsError.message };
+
+  revalidatePath("/admin/staff");
+  return { success: `${fullName} can now sign in with ${email}.` };
+}
+
+/**
+ * Removes a staff member's login entirely. The staff row goes with it via the
+ * cascade on auth.users. Suspending is usually the better move — it keeps the
+ * person's history attached to the notes they wrote.
+ */
+export async function deleteStaffMember(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const id = str(formData, "id");
+
+  if (id === admin.id) return { error: "You cannot delete your own account." };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { error: "SUPABASE_SERVICE_ROLE_KEY is not set." };
+  }
+
+  const { error } = await createAdminClient().auth.admin.deleteUser(id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/staff");
+  return { success: "Staff account removed." };
+}
+
+/** Sets a new password for someone who has lost theirs. */
+export async function resetStaffPassword(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const id = str(formData, "id");
+  const password = str(formData, "password");
+
+  if (password.length < 8) return { error: "The password must be at least 8 characters." };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { error: "SUPABASE_SERVICE_ROLE_KEY is not set." };
+  }
+
+  const { error } = await createAdminClient().auth.admin.updateUserById(id, {
+    password,
+  });
+  if (error) return { error: error.message };
+
+  return { success: "Password updated. Share it with them directly." };
+}
 
 export async function updateStaffMember(
   _prev: ActionState,

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import type { Staff } from "../../../lib/types";
+import { STAFF_ROLES, STAFF_ROLE_LABELS, STAFF_ROLE_DESCRIPTIONS } from "../../../lib/types";
 import { updateStaffMember, type ActionState } from "../../actions";
 import { Field, inputClass, buttonClass, Banner } from "../../components/ui";
 
@@ -34,15 +35,20 @@ export default function StaffMemberForm({
           <p className="text-[11px] text-[#9a9490]">{member.email}</p>
         </div>
 
-        <span
-          className={`text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border ${
-            member.is_active
-              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-              : "bg-rose-50 text-rose-800 border-rose-200"
-          }`}
-        >
-          {member.is_active ? "Active" : "Suspended"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-[#e5d9c6] bg-[#f2ece2] text-[#8f7343]">
+            {STAFF_ROLE_LABELS[member.role]}
+          </span>
+          <span
+            className={`text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border ${
+              member.is_active
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                : "bg-rose-50 text-rose-800 border-rose-200"
+            }`}
+          >
+            {member.is_active ? "Active" : "Suspended"}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -70,10 +76,13 @@ export default function StaffMemberForm({
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Role" hint="Administrators additionally control rates, photos and staff.">
+          <Field label="Role" hint={STAFF_ROLE_DESCRIPTIONS[member.role]}>
             <select name="role" defaultValue={member.role} className={inputClass}>
-              <option value="front_desk">Front desk</option>
-              <option value="admin">Administrator</option>
+              {STAFF_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {STAFF_ROLE_LABELS[r]}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Access" hint="Suspending takes effect on their next request.">

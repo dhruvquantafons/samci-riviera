@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { createClient } from "../../../lib/supabase/server";
-import { requireStaff } from "../../../lib/auth";
+import { requireBookingsAccess } from "../../../lib/auth";
 import type { Booking, BookingStatus } from "../../../lib/types";
 import { BOOKING_STATUS_LABELS, BOOKING_SOURCE_LABELS } from "../../../lib/types";
 import {
@@ -29,7 +29,7 @@ export default async function BookingsPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string }>;
 }) {
-  await requireStaff();
+  await requireBookingsAccess();
   const { status = "all", q = "" } = await searchParams;
   const supabase = await createClient();
 

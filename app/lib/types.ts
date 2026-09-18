@@ -1,4 +1,38 @@
-export type StaffRole = "admin" | "front_desk";
+export type StaffRole = "admin" | "manager" | "front_desk" | "housekeeping";
+
+/**
+ * Roles are permission tiers, not job titles. Someone's actual job — Waiter,
+ * Head Chef, Night Manager — lives in staff.job_title, which is free text.
+ */
+export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
+  admin: "Administrator",
+  manager: "Manager",
+  front_desk: "Front Desk",
+  housekeeping: "Housekeeping",
+};
+
+export const STAFF_ROLE_DESCRIPTIONS: Record<StaffRole, string> = {
+  admin: "Everything, including rates, room photos and staff accounts.",
+  manager: "Bookings, rooms, rates and photos. Cannot manage staff accounts.",
+  front_desk: "Bookings and rooms.",
+  housekeeping: "Rooms only.",
+};
+
+/** Order shown in pickers, most privileged first. */
+export const STAFF_ROLES: StaffRole[] = [
+  "admin",
+  "manager",
+  "front_desk",
+  "housekeeping",
+];
+
+export const canManageStaff = (role: StaffRole) => role === "admin";
+export const canManageRates = (role: StaffRole) =>
+  role === "admin" || role === "manager";
+export const canManageBookings = (role: StaffRole) =>
+  role === "admin" || role === "manager" || role === "front_desk";
+/** Every active staff member can see the rooms board. */
+export const canManageRooms = () => true;
 
 export type BookingStatus =
   | "new"

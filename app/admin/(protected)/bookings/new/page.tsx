@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "../../../../lib/supabase/server";
-import { requireStaff } from "../../../../lib/auth";
+import { requireBookingsAccess } from "../../../../lib/auth";
 import type { RoomType } from "../../../../lib/types";
 import { Card } from "../../../components/ui";
 import NewBookingForm from "./NewBookingForm";
 
 export default async function NewBookingPage() {
-  await requireStaff();
+  await requireBookingsAccess();
   const supabase = await createClient();
 
   const { data: roomTypes } = await supabase

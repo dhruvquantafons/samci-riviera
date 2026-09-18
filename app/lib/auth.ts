@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import { hasSupabaseConfig } from "./supabase/config";
 import type { Staff } from "./types";
+import { canManageRates, canManageBookings, canManageStaff } from "./types";
 
 /**
  * Resolves the signed-in staff member, or null. Does not redirect.
@@ -41,9 +42,23 @@ export async function requireStaff(): Promise<Staff> {
   return staff;
 }
 
-/** Same, but for admin-only work such as editing rates or managing users. */
+/** Administrators only — staff accounts and anything destructive. */
 export async function requireAdmin(): Promise<Staff> {
   const staff = await requireStaff();
-  if (staff.role !== "admin") redirect("/admin?denied=1");
+  if (!canManageStaff(staff.role)) redirect("/admin?denied=1");
+  return staff;
+}
+
+/** Administrators and managers — rates, room photography. */
+export async function requireRatesAccess(): Promise<Staff> {
+  const staff = await requireStaff();
+  if (!canManageRates(staff.role)) redirect("/admin?denied=1");
+  return staff;
+}
+
+/** Everyone except housekeeping — reservations and guest records. */
+export async function requireBookingsAccess(): Promise<Staff> {
+  const staff = await requireStaff();
+  if (!canManageBookings(staff.role)) redirect("/admin?denied=1");
   return staff;
 }
