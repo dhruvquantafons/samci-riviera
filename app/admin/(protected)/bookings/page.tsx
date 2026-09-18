@@ -16,6 +16,9 @@ import {
   nightsBetween,
 } from "../../components/ui";
 
+/** Statuses where a room should already be assigned. */
+const NEEDS_ROOM: BookingStatus[] = ["confirmed", "checked_in"];
+
 const FILTERS: { value: string; label: string }[] = [
   { value: "all", label: "All" },
   ...(Object.keys(BOOKING_STATUS_LABELS) as BookingStatus[]).map((s) => ({
@@ -35,16 +38,33 @@ export default async function BookingsPage({
 
   let query = supabase
     .from("bookings")
-    .select("*, guests(id, full_name, email, phone), room_types(id, name)")
+    .select("*, guests(id, full_name, email, phone), room_types(id, name), rooms(id, room_number)")
     .order("created_at", { ascending: false })
     .limit(200);
 
   if (status !== "all") query = query.eq("status", status);
+
   if (q) {
     const term = `%${q}%`;
-    query = query.or(
-      `reference.ilike.${term},contact_name.ilike.${term},contact_email.ilike.${term},contact_phone.ilike.${term}`,
-    );
+    const clauses = [
+      `reference.ilike.${term}`,
+      `contact_name.ilike.${term}`,
+      `contact_email.ilike.${term}`,
+      `contact_phone.ilike.${term}`,
+    ];
+
+    // Room number lives on the joined rooms table, which .or() cannot reach,
+    // so resolve matching rooms first and match on their ids. Lets the desk
+    // search "203" to find who is in that room.
+    const { data: matchedRooms } = await supabase
+      .from("rooms")
+      .select("id")
+      .ilike("room_number", term);
+
+    const roomIds = (matchedRooms ?? []).map((r) => r.id);
+    if (roomIds.length > 0) clauses.push(`room_id.in.(${roomIds.join(",")})`);
+
+    query = query.or(clauses.join(","));
   }
 
   const { data, error } = await query;
@@ -96,7 +116,7 @@ export default async function BookingsPage({
           <input
             name="q"
             defaultValue={q}
-            placeholder="Reference, name, email or phone"
+            placeholder="Reference, name, email, phone or room number"
             className={`${inputClass} pl-9`}
           />
         </div>
@@ -118,6 +138,7 @@ export default async function BookingsPage({
                   <th className="px-5 py-3 font-semibold">Guest</th>
                   <th className="px-5 py-3 font-semibold">Stay</th>
                   <th className="px-5 py-3 font-semibold">Room</th>
+                  <th className="px-5 py-3 font-semibold">Room No.</th>
                   <th className="px-5 py-3 font-semibold">Source</th>
                   <th className="px-5 py-3 font-semibold">Total</th>
                   <th className="px-5 py-3 font-semibold">Status</th>
@@ -144,6 +165,17 @@ export default async function BookingsPage({
                     </td>
                     <td className="px-5 py-3 text-[#5a5854]">
                       {b.room_types?.name ?? "—"}
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {b.rooms?.room_number ? (
+                        <span className="inline-block px-2.5 py-1 rounded-md bg-[#f2ece2] border border-[#e5d9c6] text-[#8f7343] font-medium text-xs">
+                          {b.rooms.room_number}
+                        </span>
+                      ) : NEEDS_ROOM.includes(b.status) ? (
+                        <span className="text-xs text-amber-700">Unassigned</span>
+                      ) : (
+                        <span className="text-[#c9c4bc]">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-[#5a5854] whitespace-nowrap">
                       {BOOKING_SOURCE_LABELS[b.source]}
