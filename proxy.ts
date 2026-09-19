@@ -45,12 +45,15 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isLoginRoute = pathname.startsWith("/admin/login");
+  // /admin/login/verify is the second sign-in step, reached with a session.
+  const isLoginRoute = pathname === "/admin/login";
+  const isVerifyRoute = pathname === "/admin/login/verify";
 
   if (!user && !isLoginRoute) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/admin/login";
-    loginUrl.searchParams.set("next", pathname);
+    loginUrl.search = "";
+    if (!isVerifyRoute) loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
