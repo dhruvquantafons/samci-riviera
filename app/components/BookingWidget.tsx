@@ -1,5 +1,7 @@
 "use client";
 
+import { keepFormOnSubmit } from "../admin/components/useKeepForm";
+
 import { useState, useRef, useEffect, useActionState } from "react";
 import {
   X,
@@ -14,10 +16,16 @@ import {
   Building2,
   CheckCircle2,
   Send,
+  Loader2,
 } from "lucide-react";
 import type { RoomType } from "../lib/types";
 import { toLocalIso } from "../lib/dates";
-import { submitBookingRequest, type RequestState } from "../lib/booking-request";
+import {
+  submitBookingRequest,
+  quoteStayRequest,
+  type RequestState,
+  type StayQuote,
+} from "../lib/booking-request";
 
 interface BookingWidgetProps {
   isOpen: boolean;
@@ -28,13 +36,9 @@ interface BookingWidgetProps {
   preselectedRoom?: string;
 }
 
-const SPECIAL_CODES = [
-  { value: "", label: "Standard Direct Rate" },
-  { value: "CORP", label: "Corporate Rate" },
-  { value: "HONEY", label: "Honeymoon Package" },
-  { value: "EARLYBIRD", label: "Early Bird Offer" },
-  { value: "LONGSTAY", label: "Long Stay Discount" },
-];
+const MAX_ROOMS = 5;
+
+const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 const fmtDate = (iso: string) => {
   const d = new Date(iso + "T00:00:00");
@@ -59,10 +63,18 @@ export default function BookingWidget({
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [rooms, setRooms] = useState(1);
-  const [specialCode, setSpecialCode] = useState("");
   const [roomTypeId, setRoomTypeId] = useState(
     () => roomTypes.find((rt) => rt.name === preselectedRoom)?.id ?? roomTypes[0]?.id ?? "",
   );
+  const [planId, setPlanId] = useState("");
+  const [quote, setQuote] = useState<{ key: string; value: StayQuote } | null>(null);
+
+  // Each room type takes only so many guests per room.
+  const roomType = roomTypes.find((rt) => rt.id === roomTypeId);
+  const maxAdults = Math.max(1, (roomType?.max_adults ?? 2) * rooms);
+  const maxChildren = Math.max(0, (roomType?.max_children ?? 0) * rooms);
+  const guestsAdults = Math.min(adults, maxAdults);
+  const guestsChildren = Math.min(children, maxChildren);
 
   const [state, formAction, pending] = useActionState<RequestState, FormData>(
     submitBookingRequest,
@@ -70,8 +82,34 @@ export default function BookingWidget({
   );
 
   const [guestOpen, setGuestOpen] = useState(false);
-  const [codeOpen, setCodeOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+
+  // Live price and availability, fetched a moment after the guest stops changing things.
+  const queryKey = [checkIn, checkOut, guestsAdults, guestsChildren, rooms, roomTypeId].join("|");
+  useEffect(() => {
+    if (!isOpen || !roomTypeId) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const value = await quoteStayRequest({
+        checkIn,
+        checkOut,
+        adults: guestsAdults,
+        children: guestsChildren,
+        rooms,
+        roomTypeId,
+      });
+      if (!cancelled) setQuote({ key: queryKey, value });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, queryKey, checkIn, checkOut, guestsAdults, guestsChildren, rooms, roomTypeId]);
+
+  const current = quote?.key === queryKey ? quote.value : null;
+  const checking = !!roomTypeId && !current;
+  const offers = current?.plans ?? [];
+  const selectedPlan = offers.find((p) => p.id === planId) ?? offers[0];
 
   const widgetRef = useRef<HTMLDivElement>(null);
 
@@ -105,11 +143,9 @@ export default function BookingWidget({
     )
   );
 
-  const guestSummary = `${adults} Adult${adults !== 1 ? "s" : ""}${
-    children > 0 ? `, ${children} Child${children !== 1 ? "ren" : ""}` : ""
+  const guestSummary = `${guestsAdults} Adult${guestsAdults !== 1 ? "s" : ""}${
+    guestsChildren > 0 ? `, ${guestsChildren} Child${guestsChildren !== 1 ? "ren" : ""}` : ""
   } \u2013 ${rooms} Room${rooms !== 1 ? "s" : ""}`;
-
-  const selectedCodeLabel = SPECIAL_CODES.find((c) => c.value === specialCode)?.label ?? "Standard Direct Rate";
 
   const renderCounter = (
     label: string,
@@ -206,7 +242,7 @@ export default function BookingWidget({
             </button>
           </div>
         ) : (
-        <form action={formAction} className="p-6 space-y-4">
+        <form action={formAction} onSubmit={keepFormOnSubmit(formAction)} className="p-6 space-y-4">
           {/* Tagline / direct booking benefit */}
           <div className="bg-[#faf8f5] border border-[#eee8df] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-[#5a5854]">
             <span className="flex items-center gap-1.5 font-medium text-[#1c1b1a]">
@@ -224,7 +260,6 @@ export default function BookingWidget({
                 onClick={() => {
                   setDateOpen(!dateOpen);
                   setGuestOpen(false);
-                  setCodeOpen(false);
                 }}
                 className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
               >
@@ -298,7 +333,6 @@ export default function BookingWidget({
                 onClick={() => {
                   setGuestOpen(!guestOpen);
                   setDateOpen(false);
-                  setCodeOpen(false);
                 }}
                 className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
               >
@@ -321,9 +355,18 @@ export default function BookingWidget({
               {/* Guests Counter Popover */}
               {guestOpen && (
                 <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-slide-down">
-                  {renderCounter("Adults", "Age 11+ years", adults, 1, 6, setAdults)}
-                  {renderCounter("Children", "Age 5–10 years", children, 0, 4, setChildren)}
-                  {renderCounter("Rooms", "Number of rooms required", rooms, 1, 5, setRooms)}
+                  {renderCounter("Adults", "Age 11+ years", guestsAdults, 1, maxAdults, setAdults)}
+                  {renderCounter("Children", "Age 5–10 years", guestsChildren, 0, maxChildren, setChildren)}
+                  {renderCounter("Rooms", "Number of rooms required", rooms, 1, MAX_ROOMS, setRooms)}
+                  {roomType && (
+                    <p className="text-[11px] text-[#9a9490] pt-2">
+                      {roomType.name}: up to {roomType.max_adults} adult{roomType.max_adults !== 1 ? "s" : ""}
+                      {roomType.max_children > 0
+                        ? ` and ${roomType.max_children} child${roomType.max_children !== 1 ? "ren" : ""}`
+                        : ", no children"}{" "}
+                      per room. Add a room for more guests.
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => setGuestOpen(false)}
@@ -335,65 +378,31 @@ export default function BookingWidget({
               )}
             </div>
 
-            {/* ── Field 3: Special Offer Code ── */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setCodeOpen(!codeOpen);
-                  setGuestOpen(false);
-                  setDateOpen(false);
-                }}
-                className="w-full px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors text-left group"
-              >
-                <Tag className="w-4 h-4 text-[#a88956] shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
-                    Special Promo / Code
-                  </p>
-                  <p className={`text-sm font-medium mt-0.5 ${specialCode ? "text-[#a88956]" : "text-[#1c1b1a]"}`}>
-                    {selectedCodeLabel}
-                  </p>
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 text-[#9a9490] group-hover:text-[#a88956] transition-transform ${
-                    codeOpen ? "rotate-180 text-[#a88956]" : ""
-                  }`}
+            {/* ── Field 3: Promo code ── */}
+            <label className="px-4 py-3.5 flex items-center gap-3.5 hover:bg-[#fdfcfa] transition-colors cursor-text">
+              <Tag className="w-4 h-4 text-[#a88956] shrink-0" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
+                  Promo Code (optional)
+                </span>
+                <input
+                  name="promo_code"
+                  maxLength={40}
+                  autoComplete="off"
+                  placeholder="Have a code? Our team applies it when confirming"
+                  className="w-full text-sm font-medium text-[#1c1b1a] mt-0.5 bg-transparent uppercase placeholder:normal-case placeholder:font-normal placeholder:text-[#b5afa7] focus:outline-none"
                 />
-              </button>
-
-              {/* Promo Code Selection */}
-              {codeOpen && (
-                <div className="bg-[#faf8f5] border-t border-[#ede9e2] divide-y divide-[#ede9e2] animate-slide-down">
-                  {SPECIAL_CODES.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        setSpecialCode(opt.value);
-                        setCodeOpen(false);
-                      }}
-                      className={`w-full text-left px-5 py-3 text-xs transition-colors cursor-pointer ${
-                        specialCode === opt.value
-                          ? "bg-[#fdf6ec] text-[#a88956] font-semibold"
-                          : "text-[#1c1b1a] hover:bg-white"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+              </span>
+            </label>
           </div>
 
           {/* Values chosen in the pickers above */}
           <input type="hidden" name="check_in" value={checkIn} />
           <input type="hidden" name="check_out" value={checkOut} />
-          <input type="hidden" name="adults" value={adults} />
-          <input type="hidden" name="children" value={children} />
+          <input type="hidden" name="adults" value={guestsAdults} />
+          <input type="hidden" name="children" value={guestsChildren} />
           <input type="hidden" name="rooms_count" value={rooms} />
-          <input type="hidden" name="promo_code" value={specialCode} />
+          <input type="hidden" name="rate_plan_id" value={selectedPlan?.id ?? ""} />
 
           {/* ── Room & contact details ── */}
           <div className="space-y-3 pt-1">
@@ -410,11 +419,77 @@ export default function BookingWidget({
                 >
                   {roomTypes.map((rt) => (
                     <option key={rt.id} value={rt.id}>
-                      {rt.name} — ₹{Number(rt.base_rate).toLocaleString("en-IN")} / night
+                      {rt.name}
                     </option>
                   ))}
                 </select>
               </label>
+            )}
+
+            {/* ── Live availability and rate plans ── */}
+            {checking && (
+              <p className="flex items-center gap-2 text-xs text-[#9a9490] px-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking availability…
+              </p>
+            )}
+            {current?.status === "closed" && (
+              <p className="text-xs bg-rose-50 text-rose-800 border border-rose-200 rounded-lg px-3 py-2">{current.message}</p>
+            )}
+            {current && offers.length > 0 && (
+              <div className="space-y-2">
+                <p
+                  className={`text-xs rounded-lg px-3 py-2 border ${
+                    current.status === "waitlist"
+                      ? "bg-amber-50 text-amber-900 border-amber-200"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  }`}
+                >
+                  {current.status === "waitlist" ? current.message : `Available for your dates · ${current.nights} night${current.nights !== 1 ? "s" : ""}`}
+                </p>
+                <div role="radiogroup" aria-label="Rate" className="space-y-2">
+                  {offers.map((p) => {
+                    const active = p.id === selectedPlan?.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setPlanId(p.id)}
+                        className={`w-full text-left rounded-xl border px-4 py-3 transition-colors cursor-pointer ${
+                          active ? "border-[#a88956] bg-[#fdf6ec]" : "border-[#ede9e2] bg-white hover:border-[#d9c3a3]"
+                        }`}
+                      >
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-[#1c1b1a]">{p.name}</span>
+                            <span className="block text-[11px] text-[#7a7771] mt-0.5">
+                              {p.meal} ·{" "}
+                              {p.refundable
+                                ? p.freeCancellationHours > 0
+                                  ? `Free cancellation up to ${p.freeCancellationHours} h before arrival`
+                                  : "Refundable"
+                                : "Non-refundable"}
+                            </span>
+                          </span>
+                          <span className="text-right shrink-0">
+                            <span className="block font-serif text-lg font-semibold text-[#1c1b1a] leading-tight">
+                              {rupees(p.total)}
+                            </span>
+                            <span className="block text-[10px] text-[#9a9490]">
+                              {rupees(p.perNight)} / room / night
+                            </span>
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-[#9a9490] px-1">
+                  Total for {rooms} room{rooms !== 1 ? "s" : ""}, including {current.taxLabel || "taxes"}.
+                  {selectedPlan && selectedPlan.deposit > 0 && ` A deposit of ${rupees(selectedPlan.deposit)} is due on confirmation.`}
+                </p>
+              </div>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -474,12 +549,12 @@ export default function BookingWidget({
 
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || current?.status === "closed"}
             className="w-full py-3.5 bg-[#1c1b1a] hover:bg-black text-white rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-60"
           >
             <Send className="w-4 h-4 shrink-0" />
             <span className="font-bold text-xs uppercase tracking-[0.2em]">
-              {pending ? "Sending…" : "Send booking request"}
+              {pending ? "Sending…" : current?.status === "waitlist" ? "Join the waiting list" : "Send booking request"}
             </span>
           </button>
 
