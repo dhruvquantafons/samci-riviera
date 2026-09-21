@@ -50,6 +50,10 @@ export const DEFAULT_SETTINGS: PropertySettings = {
   hr_late_grace_minutes: 10,
   default_language: "en",
   languages: ["en"],
+  invoice_prefix: "INV",
+  invoice_terms: "",
+  refund_approval_threshold: 5000,
+  online_payments_enabled: false,
   updated_at: new Date(0).toISOString(),
 };
 

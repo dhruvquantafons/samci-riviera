@@ -1,370 +1,288 @@
 # Hotel Samci Riviera
 
-A Next.js rebuild of the website for **Hotel Samci Riviera**, Srinagar — a hotel on the bank of the Jhelum River, 1.5 km from Dal Lake and Lal Chowk, with 33 Deluxe Rooms, 03 Royal Suites, 02 Presidential Suites, and conference space.
+The website and property management system (PMS) for **Hotel Samci Riviera**, Srinagar.
 
-It replaces the hotel's original five-page static site (`hotelsamciriviera.com` — Home / About / Gallery / Tariff / Contact, built in 2022) with a single-page marketing site plus supporting legal routes.
+- **Public website** (`/`): rooms, dining, gallery and a booking form with live availability and prices.
+- **Admin panel** (`/admin`): reservations, front desk, rooms and rates, housekeeping, maintenance, HR and guest records for hotel staff.
 
-## Stack
+Built to the *Hotel PMS Scope of Work* (18 modules).
 
-| | |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Runtime | React 19 |
-| Styling | Tailwind CSS v4 (via `@tailwindcss/postcss`) |
-| Icons | `lucide-react` |
-| Fonts | Cormorant Garamond (serif) + Plus Jakarta Sans (sans), via `next/font/google` |
-| Language | TypeScript (strict) |
-| Database & auth | Supabase (Postgres + Supabase Auth) |
+---
 
-## Getting started
+## Contents
+
+1. [Module status](#module-status)
+2. [Quick start](#quick-start)
+3. [Supabase setup](#supabase-setup)
+4. [Environment variables](#environment-variables)
+5. [Scripts and tests](#scripts-and-tests)
+6. [Project structure](#project-structure)
+7. [How it works](#how-it-works)
+8. [Security](#security)
+9. [Integration endpoints](#integration-endpoints)
+10. [Deployment](#deployment)
+11. [Before go-live](#before-go-live)
+12. [Known gaps](#known-gaps)
+
+---
+
+## Module status
+
+| # | Module | Status |
+|---|---|---|
+| 1 | Reservations & booking engine | ✅ Done |
+| 2 | Front desk (check-in / check-out) | ✅ Done |
+| 3 | Rooms, rates & inventory | ✅ Done |
+| 5 | Housekeeping | ✅ Done |
+| 11 | Maintenance / engineering | ✅ Done |
+| 12 | HR & staff | ✅ Done |
+| 15 | Roles, permissions & administration | ✅ Done |
+| 7 | Billing, invoicing, folio & payments | 🟡 Core done: split folios, GST invoices, online payments, refund approval. City ledger and multi-currency remain |
+| 8 | Guest CRM | 🟡 Done except loyalty points and tiers |
+| 13 | Reports | 🟡 Dashboard and night-audit report only |
+| 16 | Notifications | 🟡 Booking messages and editable templates only |
+| 17 | Guest booking portal | 🟡 Search, live price and booking request; no online payment or guest accounts |
+| 4 | Revenue & dynamic pricing | ⬜ Not started |
+| 6 | Point of sale | ⬜ Not started |
+| 9 | Channel manager / OTAs | ⬜ Not started |
+| 10 | Banquets & events | ⬜ Not started |
+| 14 | Multi-property | ⬜ Not started |
+| 18 | Mobile apps | ⬜ Not started (key staff screens already work on phones) |
+
+Loyalty points and tiers (Module 8) depend on the billing ledger and are the next piece of work.
+
+---
+
+## Quick start
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in your Supabase keys
+cp .env.example .env.local   # add your Supabase keys
 npm run dev
 ```
 
-Open <http://localhost:3000>. The public site runs without any environment
-variables; the admin panel shows a setup notice until Supabase is configured.
+Open <http://localhost:3000>. The public site works without any keys. The admin panel shows a setup notice until Supabase is configured.
 
-### Setting up Supabase
+**Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Supabase (Postgres, Auth, Storage, Realtime).
 
-The admin panel at `/admin` needs a Supabase project.
+> **Note:** this Next.js version differs from older ones. Read the guide in `node_modules/next/dist/docs/` before changing framework code (see `AGENTS.md`).
+
+---
+
+## Supabase setup
 
 1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard).
-2. In the SQL editor, run each file in `supabase/migrations/` **in order**,
-   each as its own run:
-   | File | Adds |
-   |---|---|
-   | `0001_init.sql` | Schema, RLS policies, tariff seed |
-   | `0002_room_photos.sql` | Storage bucket for room photography |
-   | `0003_room_status_and_staff.sql` | Room occupancy triggers, staff details |
-   | `0004_staff_roles.sql` | Manager and housekeeping roles |
-   | `0005_foundation.sql` | Configurable roles & permissions, property settings, audit log, sign-in tracking |
-   | `0006_rooms_and_rates.sql` | Room attributes, housekeeping status, room blocks, rate plans, seasons, restrictions, channel allocation, companies |
-   | `0007_reservations.sql` | New statuses/sources, groups, room moves, folio, guest identities, the overbooking guard |
-   | `0008_front_desk.sql` | Registration cards, private ID-document bucket, guest requests, key cards, night audit, notifications |
-   | `0009_housekeeping.sql` | Cleaning tasks, zones, checklist, inspections, DND, deep-clean schedule, lost & found |
-   | `0010_housekeeping_sow_scope.sql` | Trims housekeeping to the SOW: tasks from check-outs and deep cleans only |
-   | `0011_maintenance.sql` | Maintenance tickets, photos bucket, assets, preventive schedules, resolution targets, automatic room block/unblock |
-   | `0012_hr.sql` | HR profile fields, departments, shift types, roster, attendance and clock-in, leave, staff feedback |
-   | `0013_guest_crm_and_admin.sql` | Guest profile fields, stay statistics, feedback, merge and erase; message templates, languages, ending sessions |
+2. In the **SQL editor**, run every file in `supabase/migrations/` **in order**, one at a time.
+3. Copy the project URL, anon key and service role key (**Project Settings → API**) into `.env.local`.
+4. Add the first user under **Authentication → Users** with "Auto Confirm User" ticked. This first account becomes the administrator. Create everyone else from **Staff** in the admin panel.
 
-   0005–0008 upgrade an existing database in place: `new` bookings become
-   `tentative`, `maintenance` rooms become `out_of_order` with an open-ended
-   block, and staff keep their roles.
-   In **Authentication → Multi-Factor**, make sure TOTP is enabled (it is by
-   default) so staff can set up two-factor authentication.
-3. Copy the URL, anon key, and service role key from **Project Settings → API**
-   into `.env.local` (see `.env.example`).
-4. Add your **first** user under **Authentication → Users**, ticking "Auto
-   Confirm User". That first account automatically becomes an administrator.
-   Everyone after that is created from **Staff** inside the panel — the
-   Supabase dashboard is not needed again.
+| Migration | What it adds |
+|---|---|
+| `0001_init.sql` | Base schema, security policies, tariff |
+| `0002_room_photos.sql` | Room photo storage |
+| `0003_room_status_and_staff.sql` | Room occupancy, staff details |
+| `0004_staff_roles.sql` | Manager and housekeeping roles |
+| `0005_foundation.sql` | Roles & permissions, settings, audit log, sign-in tracking |
+| `0006_rooms_and_rates.sql` | Room blocks, rate plans, seasons, restrictions, channel allocation, companies |
+| `0007_reservations.sql` | Booking statuses, groups, room moves, folio, guest IDs, overbooking guard |
+| `0008_front_desk.sql` | Registration cards, ID scans, guest requests, key cards, night audit, message log |
+| `0009_housekeeping.sql` | Cleaning tasks, zones, checklist, inspections, DND, lost & found |
+| `0010_housekeeping_sow_scope.sql` | Trims housekeeping to the SOW |
+| `0011_maintenance.sql` | Tickets, photos, assets, preventive schedules, resolution targets |
+| `0012_hr.sql` | HR profiles, shifts, roster, attendance, leave |
+| `0013_guest_crm_and_admin.sql` | Guest profiles, feedback, merge & erase; message templates, languages, sessions |
+| `0014_billing.sql` | Split folios, GST invoice numbering, gateway payments, refund approval |
 
-On Vercel, set the same variables under **Settings → Environment
-Variables** (plus the optional integration keys below). `SUPABASE_SERVICE_ROLE_KEY` bypasses row level security — keep it
-server-side only and never expose it to the browser.
+Migrations upgrade an existing database in place; existing data is kept.
 
-Other scripts:
+---
+
+## Environment variables
+
+Set these in `.env.local` locally, and in **Vercel → Settings → Environment Variables** for Production and Preview.
+
+| Variable | Needed | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Public Supabase key |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | Server-only key: website bookings, staff accounts, feedback page. Never expose it to the browser. |
+| `TWO_FACTOR_MODE` | Before go-live | `demo` (default: every code is `123456`) or `totp` (real authenticator apps) |
+| `DEMO_2FA_CODE` | No | The demo 2FA code (default `123456`) |
+| `RESEND_API_KEY`, `NOTIFY_FROM_EMAIL` | Optional | Guest and staff emails |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Optional | SMS |
+| `DOOR_LOCK_WEBHOOK_URL`, `DOOR_LOCK_API_KEY` | Optional | Electronic key cards |
+| `ROOM_CONTROLS_SECRET` | Optional | Do Not Disturb from in-room controls |
+| `CRON_SECRET` | Optional | Scheduled maintenance job (escalations, preventive tickets) |
+| `ATTENDANCE_API_SECRET` | Optional | Biometric attendance devices |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Optional | Online payment links |
+| `RAZORPAY_WEBHOOK_SECRET` | With Razorpay | Signs the webhook. Without it no online payment reaches a folio |
+
+Without an optional key, that feature is skipped. Email, SMS and key-card attempts are still logged as "skipped", so nothing breaks.
+
+---
+
+## Scripts and tests
 
 ```bash
-npm run build   # production build
-npm start       # serve the production build
-npm run lint    # eslint
-npm test        # unit tests: pricing, tax, penalties, room assignment, passwords, HR, templates
-supabase/tests/run.sh   # migrations + database behaviour against a local Postgres
+npm run dev      # development server
+npm run build    # production build
+npm start        # serve the production build
+npm run lint     # ESLint
+npm test         # unit tests (pricing, tax, penalties, room assignment, passwords, HR, templates)
 ```
+
+Database tests apply every migration to a throwaway local Postgres and check behaviour: overbooking, permissions, housekeeping, maintenance, HR and guest records.
+
+```bash
+PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres supabase/tests/run.sh
+```
+
+---
 
 ## Project structure
 
 ```
-proxy.ts                    Session refresh + /admin route guard
-supabase/migrations/        Schema, RLS policies, triggers and seeds (run in order)
-supabase/tests/             Migration + behaviour tests against a local Postgres
-tests/                      Vitest unit tests for the pure business logic
+proxy.ts                   Session refresh and /admin sign-in guard
+supabase/migrations/       Database schema, security policies, triggers (run in order)
+supabase/tests/            Database behaviour tests
+tests/                     Unit tests
 
 app/
-├── lib/
-│   ├── auth.ts             Session: staff, role, permissions, 2FA level; guards
-│   ├── permissions.ts      The permission catalogue (module.action)
-│   ├── settings.ts         Property settings (times, tax, fees, security)
-│   ├── pricing.ts          quoteStay(): base/weekend rate → season → plan → LOS
-│   ├── tax.ts              GST slab split, inclusive or exclusive
-│   ├── policies.ts         Cancellation / no-show penalties, early/late fees, folio totals
-│   ├── room-assignment.ts  Eligible rooms ranked by preference and VIP
-│   ├── folio.ts            Room-charge posting shared by night audit and check-out
-│   ├── notifications.ts    Guest emails/SMS with an outbox record
-│   ├── integrations.ts     Email (Resend), SMS (Twilio), door-lock webhook
-│   └── booking-request.ts  Website requests (service role)
-│
+├── (site)/                Public website pages
+├── feedback/[token]/      Guest feedback form (link in the final bill email)
+├── api/                   Integration endpoints (see below)
+├── lib/                   Shared logic: auth, permissions, pricing, tax, dates, HR,
+│                          notifications, templates, integrations
 └── admin/
-    ├── *-actions.ts        Server actions per area, each re-checking its permission
-    ├── login/, security/   Sign-in with lockout, TOTP verify, password & 2FA
-    └── (protected)/
-        ├── page.tsx        Dashboard
-        ├── front-desk/     Arrivals, departures, in-house, search, requests
-        ├── bookings/       List, new, detail, check-in, check-out, folio, reg. card
-        ├── groups/         Group blocks and rooming lists
-        ├── tape-chart/     Rooms × dates planner
-        ├── rooms/          Status board, blocks, inventory, availability
-        ├── rates/          Room types, plans, seasons, restrictions, allocation
-        ├── companies/      Corporate accounts
-        ├── night-audit/    Close the day; daily reports
-        ├── staff/ roles/ settings/ audit/
+    ├── *-actions.ts       Server actions, one file per area
+    ├── login/, security/  Sign-in, 2FA, password
+    └── (protected)/       Admin pages:
+        dashboard, front-desk, bookings, guests, groups, tape-chart, rooms,
+        housekeeping, maintenance, hr, rates, companies, night-audit,
+        staff, roles, settings, audit
 ```
 
-## How booking works
+---
 
-**Statuses:** Tentative, Confirmed, Checked-In, Checked-Out, Cancelled, No-Show,
-Waitlisted. **Sources:** Walk-in, Phone, Email, Website, OTA, Travel Agent,
-Corporate, Mobile App.
+## How it works
 
-- **Website** requests are priced from the public Best Available Rate, held as
-  *tentative* for the configured hold period, and acknowledged by email. If the
-  website's channel allocation or the hotel is full they are *waitlisted*.
-- **Staff** bookings require name, phone, email, dates, room type, rate plan and
-  payment method; ID can be taken now or at check-in. The form quotes live using
-  the same pricing code the server re-runs on submit.
-- **Groups** block many rooms in one transaction — all or nothing — with names
-  added later on the rooming list.
+### Reservations and front desk
+- **Booking statuses:** Tentative, Confirmed, Checked-In, Checked-Out, Cancelled, No-Show, Waitlisted.
+- **Prices** are calculated as: base rate (or weekend rate) → season → rate plan → length-of-stay discount, plus extra adults. The agreed nightly prices are saved on the booking, so later rate changes don't affect it.
+- **Overbooking is blocked by the database.** A manager can override it with a reason, which is logged.
+- **Website bookings** show live availability and prices. The guest picks a rate plan and sends a request, which is held as *tentative* (or *waitlisted* if full) for the desk to confirm.
+- **Check-in** needs an inspected room, government ID, a signed registration card and the deposit.
+- **Check-out** settles the bill and can email it.
+- **Night audit** posts the night's room charges, marks no-shows, and moves the business date forward.
 
-**Overbooking is refused by the database.** A trigger
-(`enforce_booking_inventory`) takes a lock per room type, counts tentative,
-confirmed and in-house rooms for every night against rooms not blocked that
-night, and rejects the write if it would exceed capacity. It also refuses to
-put two stays in one physical room or a guest in a blocked room. A role with
-`bookings.overbook` can sell beyond capacity by giving a reason, which is
-stored and audited. Room types with no rooms in inventory are not checked.
+### Billing and invoicing
+- **Folios:** every stay starts with one master bill. The desk can open more — "Company", "Extras" — and move charges between them, so one stay can be billed to more than one payer.
+- **Tax invoices** are numbered `INV/2026-27/0001`: sequential per financial year, handed out by the database so two people issuing at once cannot collide, and never reused. An issued invoice cannot be edited or deleted — only cancelled, and the number stays spent.
+- The invoice freezes its own lines, totals, rate-wise tax summary and the customer's name and GSTIN, so later changes to the guest record cannot alter a document already given out.
+- **Online payments** use Razorpay payment links: the guest pays on Razorpay's page, so no card details reach this application. A folio is credited only when the signed webhook confirms the money arrived — never from the browser.
+- **Refunds** at or above the configured threshold need a second person to approve, and never the person who asked. Approving pays out and posts the folio line in one step.
 
-**Pricing:** base rate (or weekend rate on Fri/Sat) → highest-priority season
-→ rate-plan adjustment → length-of-stay discount, plus extra adults above the
-room type's included occupancy. MinLOS/MaxLOS, CTA, CTD and blackouts come from
-rate plans and restrictions. The agreed price per night is stored on the booking
-(`rate_breakdown`), so later rate changes never alter it.
+### Housekeeping
+- Check-outs create cleaning tasks automatically. Tasks are assigned by floor zone and workload, skipping staff on leave or rostered off.
+- Status flow: **Dirty → Cleaning → Clean → Inspected**. Only inspected rooms can be checked into.
+- Also included: a linen/amenities/minibar checklist, turnaround targets, deep-clean schedule, Do Not Disturb, and lost & found.
 
-**Cancellation and no-show penalties** follow the rate plan; staff see the
-amount before confirming, and waiving needs `bookings.waive_penalty`.
+### Maintenance
+- Any staff member can raise a ticket for a room, an asset or a place, with photos.
+- Priorities are Low, Medium, High and Urgent. Urgent tickets alert the engineering supervisor.
+- A ticket can take a room out of order. Resolving the ticket returns the room to sale, marked dirty for housekeeping.
+- Each priority has a resolution target; tickets past it are escalated. Assets keep their own history, and preventive schedules raise tickets when due.
 
-**Every change is audited.** Triggers write who, when, the module, and the
-before/after values of changed fields to `audit_log`, which nobody can edit or
-delete. Each booking shows its own history.
+### HR
+- **Staff profiles:** employee ID, department, shift pattern.
+- **Roster:** a weekly grid of shifts.
+- **Attendance:** self clock-in (optionally only on site), manual entry by HR, or biometric devices.
+- **Leave:** requests and approval.
+- **Performance:** summary per staff member.
+- **Payroll export:** CSV for payroll software.
 
-## Front desk
+### Guests
+- **Profiles:** stay history, total spend, preferences, birthday and anniversary.
+- **Tags:** VIP and Blacklisted (warned at booking and check-in). Repeat Guest and Corporate are added automatically.
+- **Feedback:** requested with the final bill email.
+- **Housekeeping of records:** duplicate merging, plus data export and erasure for privacy requests.
 
-- **Check-in** requires a vacant, *inspected* room (ranked by floor/view
-  preference and VIP), government ID (passport and visa for foreign nationals,
-  for Form C), a signed registration card (e-signature), and the deposit or a
-  guarantee. Scans and signatures go to the private `guest-documents` bucket,
-  readable only with `guests.view_id`; those roles see them, with the full ID
-  number, from the booking's *View ID & scans* link (each visit is audited,
-  links expire in 5 minutes). An early-arrival fee is offered and can
-  be waived (logged). Key cards are sent to the door-lock webhook if one is set.
-- **Check-out** posts any unposted room nights, offers the late fee, takes the
-  settlement, releases the room as *dirty*, and (express check-out) emails the
-  bill. A balance can remain only on a company account or with a recorded reason.
-- **Night audit** posts room charges and tax for the night, marks no-shows,
-  releases expired holds, closes the day's payments, syncs room blocks, purges
-  ID scans past retention, saves the daily report (occupancy, ADR, RevPAR,
-  revenue, payments by method and cashier) and rolls the business date.
-- **Room status** has two parts: availability (available / occupied / out of
-  order / out of service) and housekeeping (dirty → cleaning → clean →
-  inspected). Out-of-order and out-of-service are date-ranged blocks with a
-  reason, removed from bookable inventory.
+### Administration
+- **Roles:** twelve built-in, all editable, and you can add your own. Permissions are set per module and action.
+- **Audit log:** every change, with before/after values. Entries cannot be edited or deleted.
+- **Message templates:** editable per language with placeholders like `{GuestName}`, under **Settings → Edit message templates**.
+- **Activity & sessions:** see who is signed in and end someone's sessions, under **Staff → Activity & sessions**.
 
-## Housekeeping
+---
 
-- **Tasks** are created automatically when a guest checks out (or moves
-  room), and deep cleans are scheduled every *N* days (Settings) by night
-  audit. Supervisors can also add a task from the **Housekeeping** board.
-- **Assignment** is automatic: on-duty housekeepers whose zone covers the
-  room's floor first, then whoever has the fewest open tasks. Supervisors
-  reassign from the board and set zones and duty on **Setup**.
-- **Flow:** Dirty → *Start* (Cleaning) → checklist of linen, amenities and
-  minibar → *Done* (Clean) → supervisor *Pass* (Inspected — ready for guest)
-  or *Fail* (back to Dirty with a note). Only inspected rooms can be checked
-  into.
-- **Turnaround targets** per room type (Rates) or the property default
-  (Settings); overdue cleans are flagged on the board and dashboard.
-- **My tasks** is the housekeeper's phone/tablet view.
-- **Lost & found** logs items against the room (or a location) and date.
-- **DND** is set on the board, or by in-room controls posting to
-  `/api/room-controls` with `ROOM_CONTROLS_SECRET`.
+## Security
 
-## Maintenance
+Access is checked in three layers:
+1. `proxy.ts` sends signed-out visitors to the login page.
+2. Every page and server action checks the specific permission.
+3. Database row-level security checks it again as the final safeguard.
 
-- **Tickets** can be raised by anyone (the *Report problems* permission is on
-  every role) against a room, an asset or a place, with photos. Priority is
-  Low / Medium / High / Urgent. Maintenance requests logged at the front desk
-  and rooms blocked from **Rooms** become tickets automatically.
-- **Flow:** Open → *Start* (In progress) ⇄ *On hold* (with a reason) →
-  *Resolved* (what was done, optional after-photos). Supervisors assign,
-  change priority, cancel and reopen. **My tickets** is the engineer's phone
-  view; unassigned tickets can be picked up there.
-- **Rooms:** ticking *the room cannot be sold* takes it out of order from
-  today (refused while a stay is assigned — move the guest first). Resolving
-  the ticket puts it back into inventory, marked dirty for housekeeping.
-- **Targets** per priority (**Maintenance → Targets**, default 2 / 8 / 24 /
-  72 hours). A ticket past its target is escalated once; urgent tickets alert
-  at once. Alerts go to everyone whose role has *Assign tickets* — on the board
-  and dashboard, and by email/SMS when Resend/Twilio are configured.
-- **Assets** each keep their own maintenance history. **Preventive**
-  schedules (e.g. AC servicing every 90 days) raise a ticket when due.
-- Escalation and preventive tickets run at night audit, whenever the board is
-  opened, and from `GET /api/cron/maintenance` with
-  `Authorization: Bearer $CRON_SECRET` — schedule it every 15–30 minutes
-  (Vercel Cron sends that header when `CRON_SECRET` is set).
+Other protections:
+- **2FA** for administrator and finance roles. Anyone can opt in.
+- **Passwords:** complexity rules, expiry, and lockout after repeated failures.
+- **Auto sign-out** after a period of inactivity.
+- **ID scans** are private. Only authorised roles can view them, each view is logged, and scans are deleted after the retention period.
 
-## HR & attendance
+---
 
-- **My work** (every staff member): clock in / out, this week's shifts, own
-  attendance, and leave requests.
-- **Staff profiles** (HR): employee ID, department, designation, joining
-  date, usual shift and weekly day off, contact and emergency contact —
-  edited under **HR → Staff**, alongside 30-day performance (attendance,
-  rooms cleaned and passed first time, tickets resolved within target, guest
-  feedback).
-- **Shift types** (Morning, Afternoon, Night, Split) are configurable.
-  **Roster** is a week grid; *Fill from shift patterns* and *Copy last week*
-  do most of the work.
-- **Attendance:** self clock-in, manual entry by HR, or biometric devices
-  posting to `/api/attendance` with `ATTENDANCE_API_SECRET` (matched by
-  employee ID). Setting the hotel's location in **HR → Setup** records how far
-  away each phone clock-in was, and can require staff to be on site.
-- **Leave:** request → approve / decline (nobody approves their own).
-- Housekeeping auto-assignment skips staff on approved leave or rostered off,
-  and prefers those rostered that day.
-- **Payroll export** (CSV) per person: shifts, days present, hours, late
-  arrivals, absences and leave by type. It is data for payroll software, not
-  a payroll engine.
+## Integration endpoints
 
-## Guests
+| Endpoint | Used by | Auth |
+|---|---|---|
+| `POST /api/room-controls` | In-room controls (Do Not Disturb) | `Bearer ROOM_CONTROLS_SECRET` |
+| `POST /api/attendance` | Biometric attendance devices | `Bearer ATTENDANCE_API_SECRET` |
+| `GET /api/cron/maintenance` | Scheduler, every 15–30 min (e.g. Vercel Cron) | `Bearer CRON_SECRET` |
+| `POST /api/payments/razorpay/webhook` | Razorpay | `X-Razorpay-Signature` (HMAC, `RAZORPAY_WEBHOOK_SECRET`) |
 
-- **Profiles** (**Guests**) hold contact details, nationality, language,
-  birthday and anniversary, preferred room type and floor, dietary needs,
-  preferences, notes and marketing consent, with stay history, nights, total
-  spend (roles with folio access) and cancellations.
-- **Tags:** VIP and Blacklisted are set by staff (a reason is required for
-  Blacklisted, shown at booking and check-in; a new booking for a blacklisted
-  guest needs an explicit override). Repeat Guest (two or more stays) and
-  Corporate (linked company) are derived.
-- **Occasions** lists birthdays and anniversaries in the next 30 days, marking
-  guests who are staying then and whether they agreed to receive offers.
-- **Feedback:** express check-out emails the bill with a private link to
-  `/feedback/<token>` (one use, per stay). The desk can also record feedback.
-  Averages by room, service, cleanliness and food are on the Feedback tab.
-- **Duplicates** groups profiles sharing an email, phone (ignoring spaces and
-  the country code) or name; merging moves stays, ID and feedback onto the
-  kept profile.
-- **Privacy** (*guests.privacy*): download everything held about a guest as
-  JSON, or erase their personal data — the name, contact details, ID, scans
-  and preferences go; bookings and amounts stay, anonymised, for tax records.
-  Audit-log entries are kept as the legal record.
-- **Loyalty points and membership tiers** are left for the payments phase.
+Each endpoint is disabled until its secret is set. Request formats are documented at the top of each route file.
 
-## Roles and security
-
-Roles are rows in the database with a configurable set of permissions
-(`module.action`, e.g. `bookings.cancel`, `folio.payment`). Twelve roles ship —
-System Administrator, General Manager, Front Office Manager, Front Desk Agent,
-Housekeeping Supervisor, Housekeeping Staff, POS Cashier, Finance/Accounts,
-Sales & Marketing, Maintenance/Engineering, Engineering Supervisor, HR Manager —
-and administrators can edit them or
-create their own at **Roles**. Someone's actual job goes in their free-text job
-title.
-
-Enforced in layers: `proxy.ts` redirects signed-out traffic; every page and
-server action checks the specific permission; Postgres RLS policies call
-`has_permission()` as the final backstop.
-
-- **Two-factor** for any role marked "requires 2FA" (administrators and
-  finance by default); anyone can opt in at **Password & 2FA**.
-  - **Demo mode (current default):** `TWO_FACTOR_MODE=demo` — the code is
-    always `DEMO_2FA_CODE` (`123456`), shown on the sign-in screen. It protects
-    nothing; it only demonstrates the flow.
-  - **Real mode:** set `TWO_FACTOR_MODE=totp` to use authenticator apps via
-    Supabase MFA. Do this before real guest data is entered.
-- **Passwords:** minimum length and complexity, expiry, forced change after an
-  administrator sets one, and **lockout** after repeated failures.
-- **Auto sign-out** after the configured idle time, with a one-minute warning.
-- Administrators cannot change their own role or access.
-- **Activity & sessions** (**Staff → Activity & sessions**): who is active,
-  last sign-in and IP, failed sign-ins, changes made today, and *End sessions*
-  — the person is signed out on every device at their next page load.
-- **Message templates** (**Settings → Edit message templates**): the subject,
-  opening and closing paragraphs and SMS of every guest message, per enabled
-  language, with placeholders such as `{GuestName}` and `{CheckInDate}` and a
-  live preview. Guests get their profile language when a template exists,
-  otherwise the default language. The staff panel itself is in English.
-
-## Content and sources
-
-Facts on the site are taken from the hotel's published material and should not be changed without checking with the owner.
-
-- **Rates** now live in the database and are edited at `/admin/rates`. The published tariff (Premier ₹9,499, Luxury ₹10,799, extra occupant ₹2,200, child without bed ₹1,500, buffet ₹1,470, child meal ₹750) is seeded by the migration and duplicated in `app/lib/rates-fallback.ts`, which serves the public site if Supabase is unreachable. Keep the two in step.
-- **Rates are quoted on the CPAI plan** — accommodation with breakfast — and are inclusive of applicable taxes. Lunch and dinner are charged separately. This is stated on the room cards, the detail modal, the charges panel, and the admin rates page.
-- **Contact details** (`0194-3500113`, `+91 90700 90713`, `0194-3517164`, `info@hotelsamciriviera.com`) live in `app/lib/site.ts` and in `Footer.tsx`.
-- **Photography** in `public/gallery/` is the hotel's own, mirrored from the original site. It is the only genuine imagery in the repo. Room photographs can be replaced from `/admin/rates`, which uploads to the `room-photos` Supabase Storage bucket and points the room type at the new public URL.
-
-## Known gaps
-
-Tracked so nobody rediscovers them:
-
-1. **Folio is minimal.** It records charges, tax, payments, penalties and voids
-   enough for night audit and check-out. Sequential tax invoices, split folios,
-   city-ledger invoicing, refund approvals and currency conversion are Module 7.
-2. **No payment gateway.** Deposits and payments are recorded by method and
-   reference; online card capture is a Phase 8 integration.
-3. **OTA channel allocation** is stored but only the website enforces it until
-   the channel manager (Module 9) exists.
-4. **Door locks, email and SMS** are integration hooks switched on by
-   environment variables; without them the attempt is recorded as skipped.
-5. **Single property.** Tables carry no property id yet (Module 14).
-6. **No contact section** on the public site; Royal and Presidential Suites need
-   rates from the owner before they can be added at `/admin/rates`.
-7. **One lint warning** remains: `<img>` in the Hero section.
-8. **Loyalty points and tiers** (Module 8) and **multiple currencies with
-   exchange rates** (Modules 7 and 15) wait for the payments phase; the
-   property has one base currency today.
-9. **The staff panel is English only.** Languages apply to guest messages.
-
-## Data protection
-
-The admin panel stores guest personal data — names, phone numbers, email
-addresses and stay history. Before this handles real guests:
-
-- Confirm the Supabase project's region and retention are acceptable to the
-  hotel, and note them in the privacy policy, which currently describes
-  intent rather than a specific processor.
-- Give each staff member their own login. Shared accounts make access
-  impossible to revoke or attribute.
-- Suspend accounts from **Staff** when someone leaves; the row-level policies
-  read `is_active`, so access stops immediately.
-
-## Unverified content
-
-Some material on the site does not appear on the hotel's own site and has **not** been confirmed with the owner. Treat it as placeholder:
-
-- **The footer awards bar** — Condé Nast Gold List, Forbes Five-Star, Michelin Red Keys, World Luxury Hotels. None are substantiated. Publishing these as real ratings is a liability; remove or confirm before launch.
-- **The street address** in `Footer.tsx` reads "Dal Lake, Boulevard Road, Srinagar 190001". Boulevard Road runs along Dal Lake, which contradicts the hotel's own description of being 1.5 km away on the Jhelum. The source site says only "Srinagar, J&K, India".
-- **"Palace & Resort"** branding, and the entire **Dining** and **Experiences** sections (Sheesh Mahal Restaurant, The Riviera Cafe, Shikara cruises, candlelight dining). The hotel's site describes no restaurant or activities. These sections also still use stock Unsplash imagery, as does the hero.
-- The **legal pages** are a good-faith first draft written against what the site actually does. They need the owner's review — cancellation terms, check-in times, and smoking/pet policies are deliberately left as "confirmed at time of booking".
+---
 
 ## Deployment
 
-The marketing pages prerender as static content; everything under `/admin` is
-server-rendered on demand. Any Next.js host will do; Vercel is the path of
-least resistance.
+The site is deployed on **Vercel** from `master`. Every pull request gets its own preview deployment.
 
-Before deploying:
+1. Run any new migrations in Supabase **before** merging.
+2. Check the pull request's Vercel preview.
+3. Merge to `master`; production deploys automatically.
 
-- Set the canonical origin in `app/lib/site.ts` (`SITE.url`) — `metadataBase`,
-  the sitemap and `robots.txt` all derive from it.
-- Set the three Supabase variables. Without them the site still builds and
-  serves the fallback tariff, and `/admin` shows a setup notice instead of
-  failing.
-- `/admin` is excluded from search indexing via route metadata.
+Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `robots.txt` and email links all use it.
 
-## Working in this repo
+---
 
-`AGENTS.md` notes that this version of Next.js differs from what may be familiar. Read the relevant guide under `node_modules/next/dist/docs/` before writing code, and heed deprecation notices.
+## Before go-live
+
+- [ ] Switch 2FA to real mode: `TWO_FACTOR_MODE=totp`
+- [ ] Swap Razorpay test keys for live keys, and re-point the webhook at the live site
+- [ ] Confirm the invoice prefix and GSTIN with the hotel's accountant before the first invoice is issued
+- [ ] Add the email and SMS keys, then send a test message
+- [ ] Connect door locks, if used, and test with the vendor
+- [ ] Confirm the Supabase data region is acceptable to the hotel, and name it in the privacy policy
+- [ ] Give every staff member their own login (no shared accounts)
+- [ ] Remove or confirm the unverified website content below
+
+**Unverified website content** that the owner has not confirmed:
+- the footer awards bar
+- the street address in `Footer.tsx`
+- the "Palace & Resort" branding
+- the Dining and Experiences sections, which use stock photos
+- the legal pages, which are a first draft for the owner to review
+
+---
+
+## Known gaps
+
+1. **Billing:** city ledger / corporate accounts receivable and multi-currency are the remaining parts of Module 7. Guests cannot yet pay on the public site — the desk sends them a payment link.
+2. **Loyalty points and tiers** (Module 8) are the next piece of work now that the billing ledger exists.
+3. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
+4. **Single property only** (Module 14).
+5. **The staff panel is English only.** Languages apply to guest messages.
+6. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
+7. **One lint warning:** `<img>` in the homepage hero.
+
+**Room rates** are managed under **Admin → Rates**. The published tariff is also kept in `app/lib/rates-fallback.ts` as a fallback for the website; keep the two in step.

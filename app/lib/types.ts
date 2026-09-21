@@ -402,6 +402,7 @@ export interface BookingGroup {
 export interface FolioEntry {
   id: string;
   booking_id: string;
+  folio_id: string;
   kind: FolioKind;
   description: string;
   stay_date: string | null;
@@ -416,6 +417,119 @@ export interface FolioEntry {
   void_reason: string;
   created_at: string;
 }
+
+// ── Module 7: Billing & invoicing ───────────────────────────────────────────
+
+export type FolioType = "master" | "split";
+
+export interface Folio {
+  id: string;
+  booking_id: string;
+  kind: FolioType;
+  label: string;
+  company_id: string | null;
+  closed_at: string | null;
+  created_at: string;
+  companies?: Pick<Company, "id" | "name"> | null;
+}
+
+/** A charge as it was frozen onto an invoice. */
+export interface InvoiceLine {
+  date: string;
+  description: string;
+  kind: string;
+  net: number;
+  tax_rate: number;
+  tax: number;
+  total: number;
+}
+
+/** Charges grouped by tax rate — the rate-wise summary a GST invoice shows. */
+export interface TaxBand {
+  rate: number;
+  net: number;
+  tax: number;
+}
+
+export type InvoiceStatus = "issued" | "cancelled";
+
+export interface Invoice {
+  id: string;
+  number: string;
+  series: string;
+  financial_year: string;
+  seq: number;
+  booking_id: string;
+  folio_id: string;
+  bill_to_name: string;
+  bill_to_address: string;
+  bill_to_gstin: string;
+  company_id: string | null;
+  place_of_supply: string;
+  currency: string;
+  net_total: number;
+  tax_total: number;
+  grand_total: number;
+  tax_breakdown: TaxBand[];
+  lines: InvoiceLine[];
+  status: InvoiceStatus;
+  cancelled_at: string | null;
+  cancel_reason: string;
+  issued_at: string;
+  issued_by: string | null;
+  bookings?: Pick<Booking, "reference" | "check_in" | "check_out"> | null;
+}
+
+export type PaymentTxStatus = "created" | "paid" | "cancelled" | "expired" | "failed" | "refunded";
+
+export interface PaymentTransaction {
+  id: string;
+  booking_id: string;
+  folio_id: string | null;
+  provider: "razorpay";
+  provider_link_id: string | null;
+  provider_ref: string | null;
+  short_url: string;
+  purpose: "deposit" | "settlement";
+  amount: number;
+  currency: string;
+  status: PaymentTxStatus;
+  folio_entry_id: string | null;
+  paid_at: string | null;
+  expires_at: string | null;
+  last_event: string;
+  created_at: string;
+}
+
+export type RefundStatus = "pending" | "approved" | "rejected" | "processed" | "failed";
+
+export interface RefundRequest {
+  id: string;
+  booking_id: string;
+  folio_id: string | null;
+  amount: number;
+  reason: string;
+  method: PaymentMethod;
+  payment_tx_id: string | null;
+  status: RefundStatus;
+  requested_by: string | null;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string;
+  folio_entry_id: string | null;
+  processed_at: string | null;
+  error: string;
+  bookings?: Pick<Booking, "reference" | "contact_name"> | null;
+}
+
+export const REFUND_STATUS_LABELS: Record<RefundStatus, string> = {
+  pending: "Awaiting approval",
+  approved: "Approved",
+  rejected: "Rejected",
+  processed: "Refunded",
+  failed: "Failed",
+};
 
 export interface GuestRequest {
   id: string;
@@ -472,6 +586,10 @@ export interface PropertySettings {
   hr_late_grace_minutes: number;
   default_language: string;
   languages: string[];
+  invoice_prefix: string;
+  invoice_terms: string;
+  refund_approval_threshold: number;
+  online_payments_enabled: boolean;
   updated_at: string;
 }
 
