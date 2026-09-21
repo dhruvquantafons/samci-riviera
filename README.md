@@ -37,8 +37,8 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 11 | Maintenance / engineering | ✅ Done |
 | 12 | HR & staff | ✅ Done |
 | 15 | Roles, permissions & administration | ✅ Done |
-| 8 | Guest CRM | 🟡 Done except loyalty points and tiers (payments phase) |
-| 7 | Billing & payments | 🟡 Folio and payment recording only |
+| 7 | Billing, invoicing, folio & payments | 🟡 Core done: split folios, GST invoices, online payments, refund approval. City ledger and multi-currency remain |
+| 8 | Guest CRM | 🟡 Done except loyalty points and tiers |
 | 13 | Reports | 🟡 Dashboard and night-audit report only |
 | 16 | Notifications | 🟡 Booking messages and editable templates only |
 | 17 | Guest booking portal | 🟡 Search, live price and booking request; no online payment or guest accounts |
@@ -49,7 +49,7 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 14 | Multi-property | ⬜ Not started |
 | 18 | Mobile apps | ⬜ Not started (key staff screens already work on phones) |
 
-Everything that takes money (payment gateway, invoices, refunds, loyalty points) is planned as a final **payments phase**.
+Loyalty points and tiers (Module 8) depend on the billing ledger and are the next piece of work.
 
 ---
 
@@ -91,6 +91,7 @@ Open <http://localhost:3000>. The public site works without any keys. The admin 
 | `0011_maintenance.sql` | Tickets, photos, assets, preventive schedules, resolution targets |
 | `0012_hr.sql` | HR profiles, shifts, roster, attendance, leave |
 | `0013_guest_crm_and_admin.sql` | Guest profiles, feedback, merge & erase; message templates, languages, sessions |
+| `0014_billing.sql` | Split folios, GST invoice numbering, gateway payments, refund approval |
 
 Migrations upgrade an existing database in place; existing data is kept.
 
@@ -113,6 +114,8 @@ Set these in `.env.local` locally, and in **Vercel → Settings → Environment 
 | `ROOM_CONTROLS_SECRET` | Optional | Do Not Disturb from in-room controls |
 | `CRON_SECRET` | Optional | Scheduled maintenance job (escalations, preventive tickets) |
 | `ATTENDANCE_API_SECRET` | Optional | Biometric attendance devices |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Optional | Online payment links |
+| `RAZORPAY_WEBHOOK_SECRET` | With Razorpay | Signs the webhook. Without it no online payment reaches a folio |
 
 Without an optional key, that feature is skipped. Email, SMS and key-card attempts are still logged as "skipped", so nothing breaks.
 
@@ -172,6 +175,13 @@ app/
 - **Check-out** settles the bill and can email it.
 - **Night audit** posts the night's room charges, marks no-shows, and moves the business date forward.
 
+### Billing and invoicing
+- **Folios:** every stay starts with one master bill. The desk can open more — "Company", "Extras" — and move charges between them, so one stay can be billed to more than one payer.
+- **Tax invoices** are numbered `INV/2026-27/0001`: sequential per financial year, handed out by the database so two people issuing at once cannot collide, and never reused. An issued invoice cannot be edited or deleted — only cancelled, and the number stays spent.
+- The invoice freezes its own lines, totals, rate-wise tax summary and the customer's name and GSTIN, so later changes to the guest record cannot alter a document already given out.
+- **Online payments** use Razorpay payment links: the guest pays on Razorpay's page, so no card details reach this application. A folio is credited only when the signed webhook confirms the money arrived — never from the browser.
+- **Refunds** at or above the configured threshold need a second person to approve, and never the person who asked. Approving pays out and posts the folio line in one step.
+
 ### Housekeeping
 - Check-outs create cleaning tasks automatically. Tasks are assigned by floor zone and workload, skipping staff on leave or rostered off.
 - Status flow: **Dirty → Cleaning → Clean → Inspected**. Only inspected rooms can be checked into.
@@ -227,6 +237,7 @@ Other protections:
 | `POST /api/room-controls` | In-room controls (Do Not Disturb) | `Bearer ROOM_CONTROLS_SECRET` |
 | `POST /api/attendance` | Biometric attendance devices | `Bearer ATTENDANCE_API_SECRET` |
 | `GET /api/cron/maintenance` | Scheduler, every 15–30 min (e.g. Vercel Cron) | `Bearer CRON_SECRET` |
+| `POST /api/payments/razorpay/webhook` | Razorpay | `X-Razorpay-Signature` (HMAC, `RAZORPAY_WEBHOOK_SECRET`) |
 
 Each endpoint is disabled until its secret is set. Request formats are documented at the top of each route file.
 
@@ -247,6 +258,8 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
 ## Before go-live
 
 - [ ] Switch 2FA to real mode: `TWO_FACTOR_MODE=totp`
+- [ ] Swap Razorpay test keys for live keys, and re-point the webhook at the live site
+- [ ] Confirm the invoice prefix and GSTIN with the hotel's accountant before the first invoice is issued
 - [ ] Add the email and SMS keys, then send a test message
 - [ ] Connect door locks, if used, and test with the vendor
 - [ ] Confirm the Supabase data region is acceptable to the hotel, and name it in the privacy policy
@@ -264,8 +277,8 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
 
 ## Known gaps
 
-1. **Payments:** no online payment, GST invoice numbering, refund approval or company accounts yet (Module 7).
-2. **Loyalty points and tiers**, and **multiple currencies**: planned for the payments phase.
+1. **Billing:** city ledger / corporate accounts receivable and multi-currency are the remaining parts of Module 7. Guests cannot yet pay on the public site — the desk sends them a payment link.
+2. **Loyalty points and tiers** (Module 8) are the next piece of work now that the billing ledger exists.
 3. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
 4. **Single property only** (Module 14).
 5. **The staff panel is English only.** Languages apply to guest messages.

@@ -326,6 +326,12 @@ export async function saveSettings(_prev: ActionState, fd: FormData): Promise<Ac
       hk_deep_clean_days: int(fd, "hk_deep_clean_days", 30, 1, 365),
       default_language: defaultLanguage,
       languages,
+      // The prefix goes into the invoice number, so keep it to letters and
+      // digits: "INV/2026-27/0001".
+      invoice_prefix: str(fd, "invoice_prefix", 10).toUpperCase().replace(/[^A-Z0-9]/g, "") || "INV",
+      invoice_terms: str(fd, "invoice_terms", 1000),
+      refund_approval_threshold: Math.max(0, num(fd, "refund_approval_threshold") ?? 5000),
+      online_payments_enabled: bool(fd, "online_payments_enabled"),
     })
     .eq("id", true);
   if (error) return { error: friendlyDbError(error.message) };

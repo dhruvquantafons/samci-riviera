@@ -124,6 +124,32 @@ export default async function SettingsPage() {
         </Card>
 
         <Card className="p-5 space-y-4">
+          <SectionTitle>Billing &amp; invoicing</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field label="Invoice number prefix" hint="Numbers read PREFIX/2026-27/0001.">
+              <input name="invoice_prefix" defaultValue={s.invoice_prefix} maxLength={10} className={`${inputClass} uppercase`} />
+            </Field>
+            <Field label="Refund approval above (₹)" hint="0 = every refund needs approval.">
+              <input type="number" name="refund_approval_threshold" min={0} step="0.01" defaultValue={s.refund_approval_threshold} className={inputClass} />
+            </Field>
+            <div className="pt-6">
+              <Check
+                name="online_payments_enabled"
+                defaultChecked={s.online_payments_enabled}
+                label="Offer online payment links"
+              />
+            </div>
+          </div>
+          <Field label="Invoice terms" hint="Printed at the foot of every invoice.">
+            <textarea name="invoice_terms" rows={2} defaultValue={s.invoice_terms} className={inputClass} />
+          </Field>
+          <Notice tone="warn">
+            Invoice numbers are sequential per financial year and are never reused. Changing the prefix starts a new
+            series; it does not renumber invoices already issued.
+          </Notice>
+        </Card>
+
+        <Card className="p-5 space-y-4">
           <SectionTitle>Security &amp; data</SectionTitle>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <Field label="Sign out after idle (minutes)">

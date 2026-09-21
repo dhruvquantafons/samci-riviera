@@ -7,13 +7,17 @@ import { can } from "../../../../lib/permissions";
 import { getSettings } from "../../../../lib/settings";
 import { loadCompanies } from "../../../../lib/rate-data";
 import { loadFolio } from "../../../../lib/folio";
+import { razorpayConfigured, isTestMode } from "../../../../lib/razorpay";
 import { cancellationPenalty, noShowPenalty, describePenalty } from "../../../../lib/policies";
 import { rankRooms } from "../../../../lib/room-assignment";
 import { hoursUntil, todayIn } from "../../../../lib/dates";
 import type {
   AuditEntry,
   Booking,
+  Folio,
   GuestRequest,
+  Invoice,
+  PaymentTransaction,
   RatePlan,
   Room,
   RoomType,
@@ -57,6 +61,7 @@ import {
 import ActionForm from "../../../components/ActionForm";
 import LiveRefresh from "../../../components/LiveRefresh";
 import FolioPanel from "./FolioPanel";
+import BillingPanel from "./BillingPanel";
 import EditBookingForm from "./EditBookingForm";
 
 type FullBooking = Booking & { rate_plans: RatePlan | null; booking_groups: { id: string; reference: string; name: string } | null };
@@ -102,6 +107,9 @@ export default async function BookingDetailPage({
     { data: splits },
     companies,
     folio,
+    { data: folios },
+    { data: invoices },
+    { data: payments },
   ] = await Promise.all([
     supabase.from("room_types").select("*").order("sort_order"),
     supabase.from("rate_plans").select("*").order("sort_order"),
@@ -137,6 +145,14 @@ export default async function BookingDetailPage({
     supabase.from("bookings").select("id, reference, check_in, check_out").eq("split_from_id", id),
     loadCompanies(supabase),
     loadFolio(supabase, id),
+    supabase.from("folios").select("*, companies(id, name)").eq("booking_id", id).order("created_at"),
+    supabase.from("invoices").select("*").eq("booking_id", id).order("issued_at", { ascending: false }),
+    supabase
+      .from("payment_transactions")
+      .select("*")
+      .eq("booking_id", id)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   const plan = booking.rate_plans;
@@ -617,16 +633,35 @@ export default async function BookingDetailPage({
 
           {/* ── Folio ── */}
           {tab === "folio" && (
-            <FolioPanel
-              bookingId={id}
-              entries={folio.entries}
-              totals={folio.totals}
-              depositRequired={Number(booking.deposit_required)}
-              canPay={can(session, "folio.payment")}
-              canPost={can(session, "folio.post")}
-              canAdjust={can(session, "folio.adjust")}
-              today={today}
-            />
+            <div className="space-y-5">
+              <FolioPanel
+                bookingId={id}
+                entries={folio.entries}
+                totals={folio.totals}
+                depositRequired={Number(booking.deposit_required)}
+                canPay={can(session, "folio.payment")}
+                canPost={can(session, "folio.post")}
+                canAdjust={can(session, "folio.adjust")}
+                today={today}
+              />
+              <BillingPanel
+                bookingId={id}
+                folios={(folios ?? []) as Folio[]}
+                entries={folio.entries}
+                invoices={(invoices ?? []) as Invoice[]}
+                payments={(payments ?? []) as PaymentTransaction[]}
+                companies={companies}
+                balance={folio.totals.balance}
+                depositRequired={Number(booking.deposit_required)}
+                depositPaid={folio.totals.deposits}
+                refundThreshold={Number(settings.refund_approval_threshold)}
+                gatewayReady={razorpayConfigured() && settings.online_payments_enabled}
+                gatewayTestMode={isTestMode()}
+                canInvoice={can(session, "folio.invoice")}
+                canPay={can(session, "folio.payment")}
+                canAdjust={can(session, "folio.adjust")}
+              />
+            </div>
           )}
 
           {/* ── Amend ── */}

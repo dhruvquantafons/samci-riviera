@@ -19,6 +19,18 @@ export function friendlyDbError(message: string | undefined | null): string {
   if (message.startsWith("BUSINESS_DATE_MOVED:")) {
     return "Night audit has already moved the business date. Refresh and check the current date.";
   }
+  if (message.startsWith("INVOICE_IMMUTABLE")) {
+    return "An issued invoice cannot be changed or deleted. Cancel it and issue a new one.";
+  }
+  if (message.startsWith("INVOICE_CANCELLED")) {
+    return "That invoice is already cancelled.";
+  }
+  if (message.startsWith("REFUND_SELF_APPROVAL")) {
+    return "A refund must be approved by someone other than the person who requested it.";
+  }
+  if (message.startsWith("FOLIO_BOOKING_MISMATCH")) {
+    return "That folio belongs to a different booking.";
+  }
   if (/row-level security/i.test(message)) {
     return "Your role does not allow that change.";
   }

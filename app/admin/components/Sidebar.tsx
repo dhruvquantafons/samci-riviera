@@ -15,6 +15,7 @@ import {
   Contact,
   Clock,
   IndianRupee,
+  ReceiptIndianRupee,
   Building2,
   MoonStar,
   UserCog,
@@ -75,6 +76,12 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     heading: "Commercial",
     items: [
       { href: "/admin/rates", label: "Rates", icon: IndianRupee, any: ["rates.view", "rates.manage"] },
+      {
+        href: "/admin/billing/invoices",
+        label: "Billing",
+        icon: ReceiptIndianRupee,
+        any: ["folio.invoice", "folio.refund_approve"],
+      },
       { href: "/admin/companies", label: "Companies", icon: Building2, any: ["companies.manage"] },
     ],
   },

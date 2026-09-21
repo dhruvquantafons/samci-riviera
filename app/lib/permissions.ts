@@ -50,6 +50,8 @@ export const PERMISSION_GROUPS = [
       { key: "folio.post", label: "Post charges" },
       { key: "folio.payment", label: "Take payments and refunds" },
       { key: "folio.adjust", label: "Adjustments and voids" },
+      { key: "folio.invoice", label: "Issue and cancel tax invoices" },
+      { key: "folio.refund_approve", label: "Approve refunds" },
     ],
   },
   {

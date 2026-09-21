@@ -364,3 +364,56 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001
 insert into message_templates (template, language, subject) values ('confirmation', 'hi', 'बुकिंग पक्की — {Reference}');
 select language, subject from message_templates where template = 'confirmation' order by 1;
 reset role;
+
+\echo '=== Module 7: billing, invoicing and refunds ==='
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+\echo '--- every charge lands on the booking master folio without being told to'
+select count(*) as entries_without_folio_expect_0 from folio_entries where folio_id is null;
+select kind, count(*) from folios group by 1;
+
+\echo '--- a split folio takes charges moved onto it, and per-folio balances add up'
+insert into folios (booking_id, kind, label) select id, 'split', 'Company' from bookings where reference='SR-OLD1';
+update folio_entries set folio_id = (select id from folios where label='Company')
+ where kind='room' and booking_id = (select id from bookings where reference='SR-OLD1');
+select
+  (select round(folio_balance_of(id)) from folios where label='Company')   as company_folio,
+  (select round(folio_balance_of(id)) from folios where kind='master'
+     and booking_id=(select id from bookings where reference='SR-OLD1'))   as master_folio,
+  (select round(folio_balance(id)) from bookings where reference='SR-OLD1') as whole_booking;
+
+\echo '--- EXPECT refusal: a folio from another booking'
+insert into folio_entries (booking_id, folio_id, kind, amount)
+select (select id from bookings where reference='SR-OLD2'), (select id from folios where label='Company'), 'extra', 100;
+
+\echo '--- invoice numbers are sequential and never repeat'
+select next_invoice_number('INV', financial_year_of(current_date)) as first,
+       next_invoice_number('INV', financial_year_of(current_date)) as second;
+select financial_year_of('2026-04-01') as apr, financial_year_of('2026-03-31') as mar;
+
+\echo '--- EXPECT refusal: changing an issued invoice; delete removes 0 rows (no RLS delete policy)'
+insert into invoices (number, financial_year, seq, booking_id, folio_id, bill_to_name, net_total, tax_total, grand_total)
+select 'TEST/2026-27/0001', '2026-27', 1, booking_id, id, 'Test', 100, 5, 105 from folios where label='Company';
+update invoices set grand_total = 1 where number = 'TEST/2026-27/0001';
+delete from invoices where number = 'TEST/2026-27/0001';
+select count(*) as invoice_survived_delete_expect_1 from invoices where number = 'TEST/2026-27/0001';
+\echo '--- cancelling is allowed, and the number stays used'
+update invoices set status='cancelled', cancel_reason='test', cancelled_at=now() where number='TEST/2026-27/0001';
+select number, status from invoices where number = 'TEST/2026-27/0001';
+
+\echo '--- EXPECT refusal: approving your own refund request'
+insert into refund_requests (booking_id, amount, reason, method, requested_by)
+select id, 2000, 'Overcharged', 'cash', '00000000-0000-0000-0000-000000000001' from bookings where reference='SR-OLD1';
+update refund_requests set status='approved', decided_by='00000000-0000-0000-0000-000000000001', decided_at=now()
+ where reason='Overcharged';
+\echo '--- someone else may approve it'
+update refund_requests set status='approved', decided_by='00000000-0000-0000-0000-000000000002', decided_at=now()
+ where reason='Overcharged';
+select status, decided_by is not null as decided from refund_requests where reason='Overcharged';
+
+\echo '--- housekeeping cannot see invoices or payment links'
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+select count(*) as hk_sees_invoices_expect_0 from invoices;
+select count(*) as hk_sees_payments_expect_0 from payment_transactions;
+reset role;
