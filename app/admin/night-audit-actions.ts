@@ -25,7 +25,8 @@ import { type ActionState, bool } from "./form-utils";
  *   5. Syncs room availability with room blocks for tomorrow, schedules
  *      due deep cleans and preventive maintenance, and escalates overdue
  *      maintenance tickets.
- *   6. Purges identity scans past the retention period.
+ *   6. Purges identity scans past the retention period, retires expired
+ *      loyalty points and re-checks every member's tier.
  *   7. Stores the daily revenue report and rolls the business date forward.
  *
  * Each step is idempotent, so a run that fails part-way can be run again.
@@ -213,6 +214,20 @@ export async function runNightAudit(_prev: ActionState, fd: FormData): Promise<A
     }
   }
 
+  // ── 6b. Loyalty: retire expired points, re-check every member's tier ──
+  //
+  // Both are idempotent. Expiry only touches lots whose date has already
+  // passed, and a tier review that finds nothing to change writes nothing,
+  // so re-running a failed audit cannot double-count either.
+  let pointsExpired = 0;
+  let tiersReviewed = 0;
+  if (settings.loyalty_enabled) {
+    const { data: expiredPoints } = await supabase.rpc("loyalty_expire_points", { p_date: day });
+    pointsExpired = Number(expiredPoints ?? 0);
+    const { data: reviewed } = await supabase.rpc("loyalty_evaluate_all", { p_date: day });
+    tiersReviewed = Number(reviewed ?? 0);
+  }
+
   // ── 7. Daily revenue report ──
   const [{ count: sellable }, { count: arrivals }, { count: departures }, { count: cancellations }] = await Promise.all([
     supabase.from("rooms").select("id", { count: "exact", head: true }).neq("status", "out_of_service"),
@@ -273,6 +288,7 @@ export async function runNightAudit(_prev: ActionState, fd: FormData): Promise<A
     housekeeping: { room_statuses_updated: blocksApplied, tasks_created: (hkCreated as number | null) ?? 0 },
     maintenance: { preventive_created: (mtCreated as number | null) ?? 0, escalated: mtEscalated },
     compliance: { id_documents_purged: purged },
+    loyalty: { points_expired: pointsExpired, tiers_reviewed: tiersReviewed },
     posted_room_charges: charges.posted,
   };
 

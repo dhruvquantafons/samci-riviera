@@ -177,6 +177,20 @@ export default async function InvoicePage({
               <span>Invoice total</span>
               <span>{fmtMoney(invoice.grand_total)}</span>
             </p>
+            {invoice.fx_currency && invoice.fx_rate && Number(invoice.fx_rate) > 0 && (
+              <p className="flex justify-between text-[11px] text-slate-500">
+                <span>
+                  Settled in {invoice.fx_currency} at {Number(invoice.fx_rate)} per unit
+                </span>
+                <span>
+                  {invoice.fx_currency}{" "}
+                  {(Number(invoice.grand_total) / Number(invoice.fx_rate)).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </p>
+            )}
           </div>
         </div>
 

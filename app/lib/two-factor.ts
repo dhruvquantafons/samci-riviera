@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { TWO_FACTOR_COOKIE, TWO_FACTOR_COOKIE_PATH } from "./session-cookies";
 
 /**
  * Second sign-in step.
@@ -17,7 +18,7 @@ import { cookies } from "next/headers";
  * secret, bound to the user and valid for 12 hours or until sign-out.
  */
 
-export const TWO_FACTOR_COOKIE = "pms_2fa";
+export { TWO_FACTOR_COOKIE };
 const VALID_MS = 12 * 60 * 60 * 1000;
 
 export function isDemoTwoFactor() {
@@ -49,13 +50,13 @@ export async function setDemoVerified(userId: string) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/admin",
+    path: TWO_FACTOR_COOKIE_PATH,
     maxAge: VALID_MS / 1000,
   });
 }
 
 export async function clearDemoVerified() {
-  (await cookies()).delete({ name: TWO_FACTOR_COOKIE, path: "/admin" });
+  (await cookies()).delete({ name: TWO_FACTOR_COOKIE, path: TWO_FACTOR_COOKIE_PATH });
 }
 
 export async function isDemoVerified(userId: string) {

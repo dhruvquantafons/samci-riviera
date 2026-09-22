@@ -54,6 +54,12 @@ export const DEFAULT_SETTINGS: PropertySettings = {
   invoice_terms: "",
   refund_approval_threshold: 5000,
   online_payments_enabled: false,
+  multi_currency_enabled: false,
+  ar_reminder_days: 7,
+  loyalty_enabled: false,
+  loyalty_program_name: "Riviera Rewards",
+  loyalty_expiry_months: 24,
+  loyalty_min_redeem_points: 500,
   updated_at: new Date(0).toISOString(),
 };
 

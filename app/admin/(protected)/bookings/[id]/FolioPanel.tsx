@@ -111,6 +111,12 @@ export default function FolioPanel({
                       {e.method && ` · ${PAYMENT_METHOD_LABELS[e.method]}`}
                       {e.reference && ` · ${e.reference}`}
                       {e.voided_at && <span className="no-underline"> (void: {e.void_reason})</span>}
+                      {e.fx_currency && e.fx_amount !== null && (
+                        <span className="block text-[10px] text-slate-500 no-underline">
+                          Paid {e.fx_currency} {Number(e.fx_amount).toLocaleString("en-IN")} at{" "}
+                          {Number(e.fx_rate)} per unit
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3 text-right whitespace-nowrap">
                       {credit ? "−" : ""}

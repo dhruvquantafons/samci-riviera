@@ -417,3 +417,185 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003
 select count(*) as hk_sees_invoices_expect_0 from invoices;
 select count(*) as hk_sees_payments_expect_0 from payment_transactions;
 reset role;
+
+\echo '=== Module 7: city ledger and multi-currency ==='
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+\echo '--- EXPECT refusal: moving the base currency off a rate of 1'
+update currencies set rate_to_base = 1.5 where code = 'INR';
+select code, rate_to_base from currencies where code = 'INR';
+
+\echo '--- a company on 30-day terms with a 20,000 credit limit'
+insert into companies (id, name, credit_limit, payment_terms_days)
+values ('00000000-0000-0000-0000-0000000000c1', 'Dal Travels', 20000, 30)
+on conflict (id) do update set credit_limit = 20000, payment_terms_days = 30;
+
+\echo '--- a folio on a departed stay that still owes 5,000'
+insert into folios (id, booking_id, kind, label)
+select '00000000-0000-0000-0000-0000000000f1', id, 'split', 'Delegates'
+  from bookings where reference='SR-1011';
+insert into folio_entries (booking_id, folio_id, kind, description, amount)
+select id, '00000000-0000-0000-0000-0000000000f1', 'extra', 'Conference lunch', 5000
+  from bookings where reference='SR-1011';
+select round(folio_balance_of('00000000-0000-0000-0000-0000000000f1')) as folio_owes_expect_5000;
+
+\echo '--- transferring settles the folio and opens the receivable on terms'
+select city_ledger_transfer('00000000-0000-0000-0000-0000000000f1',
+  '00000000-0000-0000-0000-0000000000c1', date '2026-09-22', 'PO 4471') is not null as transferred;
+select round(folio_balance_of('00000000-0000-0000-0000-0000000000f1')) as folio_now_expect_0,
+       round(company_balance('00000000-0000-0000-0000-0000000000c1')) as company_owes_expect_5000;
+select kind, round(amount) as amount, due_date, method
+  from city_ledger_entries where company_id='00000000-0000-0000-0000-0000000000c1' order by created_at;
+\echo '    (the folio carries a matching corporate-billing credit)'
+select kind, method, round(amount) as amount from folio_entries
+ where folio_id='00000000-0000-0000-0000-0000000000f1' and kind='payment';
+
+\echo '--- EXPECT refusal: billing the same folio to a company twice'
+insert into folio_entries (booking_id, folio_id, kind, description, amount)
+select id, '00000000-0000-0000-0000-0000000000f1', 'extra', 'Late charge', 500
+  from bookings where reference='SR-1011';
+select city_ledger_transfer('00000000-0000-0000-0000-0000000000f1',
+  '00000000-0000-0000-0000-0000000000c1', date '2026-09-22', 'again');
+
+\echo '--- EXPECT refusal: a transfer that would breach the credit limit'
+insert into folios (id, booking_id, kind, label)
+select '00000000-0000-0000-0000-0000000000f3', id, 'split', 'Banquet'
+  from bookings where reference='SR-1011';
+insert into folio_entries (booking_id, folio_id, kind, description, amount)
+select id, '00000000-0000-0000-0000-0000000000f3', 'extra', 'Banquet hall', 18000
+  from bookings where reference='SR-1011';
+select city_ledger_transfer('00000000-0000-0000-0000-0000000000f3',
+  '00000000-0000-0000-0000-0000000000c1', date '2026-09-22', 'over limit');
+
+\echo '--- a receipt on account reduces the balance'
+insert into city_ledger_entries (company_id, kind, amount, method, description)
+values ('00000000-0000-0000-0000-0000000000c1', 'payment', 2000, 'bank_transfer', 'Part payment');
+select round(company_balance('00000000-0000-0000-0000-0000000000c1')) as company_owes_expect_3000;
+
+\echo '--- voiding the transfer reverses both books at once'
+select city_ledger_void(
+  (select id from city_ledger_entries
+    where company_id='00000000-0000-0000-0000-0000000000c1' and kind='charge' and voided_at is null limit 1),
+  'Billed to the wrong company');
+select round(company_balance('00000000-0000-0000-0000-0000000000c1')) as company_owes_expect_minus_2000,
+       round(folio_balance_of('00000000-0000-0000-0000-0000000000f1')) as folio_back_expect_5500;
+
+\echo '--- EXPECT refusal: voiding without a reason'
+insert into city_ledger_entries (id, company_id, kind, amount, method, description)
+values ('00000000-0000-0000-0000-0000000000c9', '00000000-0000-0000-0000-0000000000c1', 'payment', 100, 'cash', 'Void me');
+select city_ledger_void('00000000-0000-0000-0000-0000000000c9', '   ');
+
+\echo '--- a payment in another currency is credited in the base currency'
+insert into folio_entries (booking_id, folio_id, kind, description, amount, method, fx_currency, fx_amount, fx_rate)
+select id, '00000000-0000-0000-0000-0000000000f1', 'payment', 'Payment in USD', 8800, 'cash', 'USD', 100, 88
+  from bookings where reference='SR-1011';
+select fx_currency, fx_amount, fx_rate, round(amount) as base_amount
+  from folio_entries where fx_currency is not null;
+
+\echo '--- EXPECT refusal: a foreign amount without its currency and rate'
+insert into folio_entries (booking_id, folio_id, kind, description, amount, method, fx_amount)
+select id, '00000000-0000-0000-0000-0000000000f1', 'payment', 'Half a record', 100, 'cash', 50
+  from bookings where reference='SR-1011';
+
+\echo '--- housekeeping cannot see the city ledger'
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+select count(*) as hk_sees_city_ledger_expect_0 from city_ledger_entries;
+\echo '--- but anyone may read exchange rates, since anyone may quote a price'
+select count(*) > 0 as hk_sees_rates_expect_t from currencies;
+reset role;
+
+\echo '=== Module 8: loyalty points and tiers ==='
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+update property_settings set loyalty_enabled = true, loyalty_expiry_months = 24, loyalty_min_redeem_points = 500;
+
+\echo '--- enrolling gives a membership number and the entry tier'
+insert into guests (id, full_name, email)
+values ('00000000-0000-0000-0000-0000000000a2', 'Imran Rather', 'imran@example.com')
+on conflict (id) do nothing;
+update bookings set guest_id = '00000000-0000-0000-0000-0000000000a2' where reference = 'SR-1012';
+select loyalty_enroll('00000000-0000-0000-0000-0000000000a2') like 'RR%' as got_member_no;
+select loyalty_opt_in, loyalty_tier from guests where id='00000000-0000-0000-0000-0000000000a2';
+
+\echo '--- an issued invoice earns points on the taxable value at the tier rate'
+insert into folios (id, booking_id, kind, label)
+select '00000000-0000-0000-0000-0000000000f2', id, 'split', 'Loyalty' from bookings where reference='SR-1012';
+insert into folio_entries (booking_id, folio_id, kind, description, amount, tax_amount, tax_rate)
+select id, '00000000-0000-0000-0000-0000000000f2', 'extra', 'Spa package', 20000, 1000, 5
+  from bookings where reference='SR-1012';
+insert into invoices (number, financial_year, seq, booking_id, folio_id, bill_to_name, net_total, tax_total, grand_total)
+select 'LOY/2026-27/0901', '2026-27', 901, id, '00000000-0000-0000-0000-0000000000f2',
+       'Imran Rather', 20000, 1000, 21000 from bookings where reference='SR-1012';
+\echo '    20,000 taxable at silver (0.05/unit) = 1,000 points; tax earns nothing'
+select loyalty_balance('00000000-0000-0000-0000-0000000000a2') as balance_expect_1000;
+select kind, points, remaining, round(base_amount) as on_spend, expires_on is not null as expires
+  from loyalty_transactions where guest_id='00000000-0000-0000-0000-0000000000a2';
+
+\echo '--- reprinting or re-inserting the same invoice does not earn twice'
+select loyalty_award_for_invoice((select id from invoices where number='LOY/2026-27/0901')) as awarded_expect_0;
+select loyalty_balance('00000000-0000-0000-0000-0000000000a2') as balance_still_1000;
+
+\echo '--- a goodwill correction opens a second lot'
+select loyalty_adjust('00000000-0000-0000-0000-0000000000a2', 500, 'Goodwill, lift outage') as balance_expect_1500;
+
+\echo '--- EXPECT refusal: a correction with no reason'
+select loyalty_adjust('00000000-0000-0000-0000-0000000000a2', 100, '  ');
+
+\echo '--- EXPECT refusal: spending more points than are held'
+select loyalty_consume('00000000-0000-0000-0000-0000000000a2', 99999);
+
+\echo '--- redeeming credits the folio, and eats the oldest lot first'
+select round(loyalty_redeem(
+  '00000000-0000-0000-0000-0000000000a2',
+  (select id from bookings where reference='SR-1012'),
+  '00000000-0000-0000-0000-0000000000f2',
+  1200, 'Points off the bill')) as rupees_off_expect_300;
+select loyalty_balance('00000000-0000-0000-0000-0000000000a2') as balance_expect_300;
+select kind, points, remaining from loyalty_transactions
+ where guest_id='00000000-0000-0000-0000-0000000000a2' order by created_at;
+\echo '    (the folio carries a loyalty_points payment of 300)'
+select kind, method, round(amount) as amount from folio_entries
+ where folio_id='00000000-0000-0000-0000-0000000000f2' and method='loyalty_points';
+
+\echo '--- EXPECT refusal: a redemption below the property minimum'
+select loyalty_redeem('00000000-0000-0000-0000-0000000000a2',
+  (select id from bookings where reference='SR-1012'),
+  '00000000-0000-0000-0000-0000000000f2', 100, 'too few');
+
+\echo '--- EXPECT refusal: a redemption worth more than the bill'
+insert into folios (id, booking_id, kind, label)
+select '00000000-0000-0000-0000-0000000000f4', id, 'split', 'Tiny' from bookings where reference='SR-1012';
+insert into folio_entries (booking_id, folio_id, kind, description, amount)
+select id, '00000000-0000-0000-0000-0000000000f4', 'extra', 'Bottle of water', 20
+  from bookings where reference='SR-1012';
+select loyalty_adjust('00000000-0000-0000-0000-0000000000a2', 5000, 'Top up for the over-balance check');
+select loyalty_redeem('00000000-0000-0000-0000-0000000000a2',
+  (select id from bookings where reference='SR-1012'),
+  '00000000-0000-0000-0000-0000000000f4', 5000, 'worth 1250 against a 20 bill');
+
+\echo '--- expiry retires only what is left in a lot whose date has passed'
+update loyalty_transactions set expires_on = date '2020-01-01'
+ where guest_id='00000000-0000-0000-0000-0000000000a2' and remaining > 0;
+select loyalty_expire_points(date '2026-09-22') as points_expired_expect_5300;
+select loyalty_balance('00000000-0000-0000-0000-0000000000a2') as balance_expect_0;
+select kind, points from loyalty_transactions
+ where guest_id='00000000-0000-0000-0000-0000000000a2' and kind='expire' order by points;
+
+\echo '--- tiers need both nights and spend, so this guest stays on the entry tier'
+select nights, round(spend) as spend from loyalty_rolling_activity('00000000-0000-0000-0000-0000000000a2', date '2026-09-22');
+select loyalty_evaluate_tier('00000000-0000-0000-0000-0000000000a2', date '2026-09-22') as tier_expect_silver;
+
+\echo '--- erasing a guest removes the membership and its points history'
+select loyalty_erase('00000000-0000-0000-0000-0000000000a2');
+select loyalty_opt_in, loyalty_member_no is null as no_number, loyalty_tier is null as no_tier
+  from guests where id='00000000-0000-0000-0000-0000000000a2';
+select count(*) as points_rows_expect_0 from loyalty_transactions where guest_id='00000000-0000-0000-0000-0000000000a2';
+
+\echo '--- housekeeping may read tiers to honour a perk, but not change them'
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+select count(*) > 0 as hk_sees_tiers_expect_t from loyalty_tiers;
+update loyalty_tiers set earn_rate = 99 where key = 'silver';
+select earn_rate as earn_rate_expect_0_05 from loyalty_tiers where key = 'silver';
+reset role;

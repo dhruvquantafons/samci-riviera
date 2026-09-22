@@ -50,6 +50,7 @@ export type PaymentMethod =
   | "corporate_billing"
   | "ota_prepaid"
   | "wallet"
+  | "loyalty_points"
   | "other";
 
 export type FolioKind = "room" | "fee" | "penalty" | "extra" | "payment" | "refund" | "adjustment";
@@ -255,6 +256,10 @@ export interface Guest {
   blacklist_reason: string;
   marketing_opt_in: boolean;
   erased_at: string | null;
+  loyalty_opt_in: boolean;
+  loyalty_member_no: string | null;
+  loyalty_tier: string | null;
+  loyalty_joined_on: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -377,7 +382,12 @@ export interface Booking {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-  guests?: (Pick<Guest, "id" | "full_name" | "email" | "phone"> & Partial<Pick<Guest, "tags" | "blacklist_reason">>) | null;
+  guests?:
+    | (Pick<Guest, "id" | "full_name" | "email" | "phone"> &
+        Partial<
+          Pick<Guest, "tags" | "blacklist_reason" | "loyalty_opt_in" | "loyalty_member_no" | "loyalty_tier">
+        >)
+    | null;
   room_types?: Pick<RoomType, "id" | "name"> | null;
   rooms?: Pick<Room, "id" | "room_number"> | null;
   rate_plans?: Pick<RatePlan, "id" | "code" | "name"> | null;
@@ -412,6 +422,10 @@ export interface FolioEntry {
   method: PaymentMethod | null;
   reference: string;
   is_deposit: boolean;
+  /** Set when the guest settled in a currency other than the property's. */
+  fx_currency: string | null;
+  fx_amount: number | null;
+  fx_rate: number | null;
   night_audit_date: string | null;
   voided_at: string | null;
   void_reason: string;
@@ -477,6 +491,9 @@ export interface Invoice {
   cancel_reason: string;
   issued_at: string;
   issued_by: string | null;
+  /** The rate a foreign-currency copy of this invoice reprints at. */
+  fx_currency: string | null;
+  fx_rate: number | null;
   bookings?: Pick<Booking, "reference" | "check_in" | "check_out"> | null;
 }
 
@@ -590,6 +607,12 @@ export interface PropertySettings {
   invoice_terms: string;
   refund_approval_threshold: number;
   online_payments_enabled: boolean;
+  multi_currency_enabled: boolean;
+  ar_reminder_days: number;
+  loyalty_enabled: boolean;
+  loyalty_program_name: string;
+  loyalty_expiry_months: number;
+  loyalty_min_redeem_points: number;
   updated_at: string;
 }
 
@@ -757,6 +780,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   corporate_billing: "Company bill (direct billing)",
   ota_prepaid: "Prepaid via OTA",
   wallet: "Wallet",
+  loyalty_points: "Loyalty points",
   other: "Other",
 };
 
@@ -1051,3 +1075,99 @@ export const ATTENDANCE_METHOD_LABELS: Record<AttendanceMethod, string> = {
 };
 
 export const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// ── Module 7: City ledger and multi-currency ────────────────────────────────
+
+export interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+  rate_to_base: number;
+  decimals: number;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export type CityLedgerKind = "charge" | "payment" | "adjustment" | "writeoff";
+
+export const CITY_LEDGER_KIND_LABELS: Record<CityLedgerKind, string> = {
+  charge: "Charge",
+  payment: "Payment received",
+  adjustment: "Credit note",
+  writeoff: "Written off",
+};
+
+export interface CityLedgerEntry {
+  id: string;
+  company_id: string;
+  kind: CityLedgerKind;
+  amount: number;
+  description: string;
+  booking_id: string | null;
+  folio_id: string | null;
+  invoice_id: string | null;
+  folio_entry_id: string | null;
+  due_date: string | null;
+  method: PaymentMethod | null;
+  reference: string;
+  voided_at: string | null;
+  void_reason: string;
+  created_at: string;
+  companies?: Pick<Company, "name"> | null;
+  bookings?: Pick<Booking, "reference"> | null;
+  invoices?: Pick<Invoice, "number"> | null;
+}
+
+// ── Module 8: Loyalty ───────────────────────────────────────────────────────
+
+export interface LoyaltyTier {
+  key: string;
+  name: string;
+  sort_order: number;
+  min_nights: number;
+  min_spend: number;
+  earn_rate: number;
+  redeem_rate: number;
+  perks: string;
+  colour: string;
+  is_active: boolean;
+}
+
+export type LoyaltyTxKind = "earn" | "redeem" | "expire" | "adjust";
+
+export const LOYALTY_TX_LABELS: Record<LoyaltyTxKind, string> = {
+  earn: "Earned",
+  redeem: "Redeemed",
+  expire: "Expired",
+  adjust: "Correction",
+};
+
+export interface LoyaltyTransaction {
+  id: string;
+  guest_id: string;
+  kind: LoyaltyTxKind;
+  points: number;
+  remaining: number;
+  base_amount: number;
+  booking_id: string | null;
+  invoice_id: string | null;
+  folio_entry_id: string | null;
+  source_id: string | null;
+  tier: string | null;
+  description: string;
+  expires_on: string | null;
+  created_at: string;
+  guests?: Pick<Guest, "full_name" | "loyalty_member_no"> | null;
+  bookings?: Pick<Booking, "reference"> | null;
+}
+
+export interface LoyaltyTierChange {
+  id: string;
+  guest_id: string;
+  from_tier: string | null;
+  to_tier: string | null;
+  reason: string;
+  nights: number;
+  spend: number;
+  changed_at: string;
+}

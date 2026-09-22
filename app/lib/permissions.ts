@@ -41,6 +41,8 @@ export const PERMISSION_GROUPS = [
       { key: "guests.view_id", label: "View identity documents" },
       { key: "guests.privacy", label: "Merge duplicates, export and erase guest data" },
       { key: "companies.manage", label: "Manage corporate accounts" },
+      { key: "loyalty.manage", label: "Loyalty programme: tiers, enrolment and corrections" },
+      { key: "loyalty.redeem", label: "Redeem loyalty points against a bill" },
     ],
   },
   {
@@ -52,6 +54,7 @@ export const PERMISSION_GROUPS = [
       { key: "folio.adjust", label: "Adjustments and voids" },
       { key: "folio.invoice", label: "Issue and cancel tax invoices" },
       { key: "folio.refund_approve", label: "Approve refunds" },
+      { key: "folio.city_ledger", label: "City ledger: bill companies and record receipts" },
     ],
   },
   {

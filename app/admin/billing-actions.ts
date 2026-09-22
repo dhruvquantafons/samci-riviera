@@ -169,6 +169,12 @@ export async function issueInvoice(_prev: ActionState, fd: FormData): Promise<Ac
     return { error: friendlyDbError(seqError?.message ?? "Could not allocate an invoice number.") };
   }
 
+  // If the guest settled any part of this folio in another currency, note
+  // that currency and the rate used on the invoice, so a foreign-currency
+  // copy of the document always reprints with the same numbers. The invoice
+  // itself stays denominated in the property's own currency.
+  const settledIn = entries.find((e) => !e.voided_at && e.kind === "payment" && e.fx_currency);
+
   const { data: invoice, error } = await supabase
     .from("invoices")
     .insert({
@@ -189,6 +195,8 @@ export async function issueInvoice(_prev: ActionState, fd: FormData): Promise<Ac
       grand_total: totals.grand,
       tax_breakdown: bands,
       lines,
+      fx_currency: settledIn?.fx_currency ?? null,
+      fx_rate: settledIn?.fx_rate ?? null,
       issued_by: session.staff.id,
     })
     .select("id, number")

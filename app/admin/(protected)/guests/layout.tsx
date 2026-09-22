@@ -9,6 +9,7 @@ export default async function GuestsLayout({ children }: { children: React.React
     { href: "/admin/guests", label: "Guests" },
     { href: "/admin/guests/occasions", label: "Occasions" },
     { href: "/admin/guests/feedback", label: "Feedback" },
+    { href: "/admin/guests/loyalty", label: "Loyalty" },
     can(session, "guests.privacy") && { href: "/admin/guests/duplicates", label: "Duplicates" },
   ].filter(Boolean) as { href: string; label: string }[];
   return (
