@@ -29,7 +29,7 @@ export default async function InvoicesPage() {
 
   const { data } = await supabase
     .from("invoices")
-    .select("*, bookings(reference, check_in, check_out)")
+    .select("*, bookings(reference, check_in, check_out), event_bookings(number, title, event_date)")
     .order("issued_at", { ascending: false })
     .limit(300);
   const invoices = (data ?? []) as Invoice[];
@@ -50,7 +50,7 @@ export default async function InvoicesPage() {
 
       <Card>
         {invoices.length === 0 ? (
-          <EmptyState message="No invoices have been issued yet. Raise one from a booking's Folio tab." />
+          <EmptyState message="No invoices have been issued yet. Raise one from a booking's Folio tab, or from an event." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -59,8 +59,8 @@ export default async function InvoicesPage() {
                   <th className="py-2 px-4 font-semibold">Number</th>
                   <th className="py-2 pr-3 font-semibold">Issued</th>
                   <th className="py-2 pr-3 font-semibold">Billed to</th>
-                  <th className="py-2 pr-3 font-semibold">Booking</th>
-                  <th className="py-2 pr-3 font-semibold">Stay</th>
+                  <th className="py-2 pr-3 font-semibold">Booking or event</th>
+                  <th className="py-2 pr-3 font-semibold">Stay or function</th>
                   <th className="py-2 pr-3 font-semibold text-right">Taxable</th>
                   <th className="py-2 pr-3 font-semibold text-right">{settings.tax_label}</th>
                   <th className="py-2 pr-3 font-semibold text-right">Total</th>
@@ -72,7 +72,11 @@ export default async function InvoicesPage() {
                   <tr key={i.id} className={i.status === "cancelled" ? "text-slate-400" : ""}>
                     <td className="py-2 px-4 whitespace-nowrap">
                       <Link
-                        href={`/admin/bookings/${i.booking_id}/invoice/${i.id}`}
+                        href={
+                          i.event_id
+                            ? `/admin/events/${i.event_id}/invoice/${i.id}`
+                            : `/admin/bookings/${i.booking_id}/invoice/${i.id}`
+                        }
                         className="font-mono text-yellow-700 hover:underline"
                       >
                         {i.number}
@@ -84,12 +88,22 @@ export default async function InvoicesPage() {
                       {i.bill_to_gstin && <span className="block text-[11px] text-slate-500">GSTIN {i.bill_to_gstin}</span>}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">
-                      <Link href={`/admin/bookings/${i.booking_id}`} className="font-mono text-yellow-700 hover:underline">
-                        {i.bookings?.reference ?? "—"}
-                      </Link>
+                      {i.event_id ? (
+                        <Link href={`/admin/events/${i.event_id}`} className="font-mono text-yellow-700 hover:underline">
+                          {i.event_bookings?.number ?? "Event"}
+                        </Link>
+                      ) : (
+                        <Link href={`/admin/bookings/${i.booking_id}`} className="font-mono text-yellow-700 hover:underline">
+                          {i.bookings?.reference ?? "—"}
+                        </Link>
+                      )}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">
-                      {i.bookings ? `${fmtDate(i.bookings.check_in)} → ${fmtDate(i.bookings.check_out)}` : "—"}
+                      {i.event_bookings
+                        ? `${i.event_bookings.title} · ${fmtDate(i.event_bookings.event_date)}`
+                        : i.bookings
+                          ? `${fmtDate(i.bookings.check_in)} → ${fmtDate(i.bookings.check_out)}`
+                          : "—"}
                     </td>
                     <td className="py-2 pr-3 text-right whitespace-nowrap">{fmtMoney(i.net_total)}</td>
                     <td className="py-2 pr-3 text-right whitespace-nowrap">{fmtMoney(i.tax_total)}</td>

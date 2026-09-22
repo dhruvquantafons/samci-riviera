@@ -37,6 +37,7 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 6 | Point of sale | ✅ Done |
 | 7 | Billing, invoicing, folio & payments | ✅ Done |
 | 8 | Guest CRM & loyalty | ✅ Done |
+| 10 | Banquets & events | ✅ Done |
 | 11 | Maintenance / engineering | ✅ Done |
 | 12 | HR & staff | ✅ Done |
 | 13 | Reporting & analytics | ✅ Done |
@@ -45,11 +46,10 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 17 | Guest booking portal | 🟡 Search, live price and booking request; no online payment or guest accounts |
 | 4 | Revenue & dynamic pricing | ⬜ Not started |
 | 9 | Channel manager / OTAs | ⬜ Not started |
-| 10 | Banquets & events | ⬜ Not started |
 | 14 | Multi-property | ⬜ Not started |
 | 18 | Mobile apps | ⬜ Not started (key staff screens already work on phones) |
 
-Modules 4, 9, 10, 14 and 18 are the remaining work.
+Modules 4, 9, 14 and 18 are the remaining work.
 
 The optional stock module in Module 6 (recipe and ingredient deduction) is deliberately not built: the SOW marks
 it optional.
@@ -99,6 +99,7 @@ Open <http://localhost:3000>. The public site works without any keys. The admin 
 | `0016_loyalty.sql` | Loyalty tiers, points lots, redemption, expiry, tier history |
 | `0017_pos.sql` | Outlets, menus, modifiers, bills, split/merge, charge to room, KOT |
 | `0018_reports.sql` | Permission-checked report functions, KPI sources, scheduled reports |
+| `0019_events.sql` | Event spaces, seating plans, per-head catering, quotations, approval, event billing |
 
 Migrations upgrade an existing database in place; existing data is kept.
 
@@ -167,13 +168,14 @@ app/
 ├── api/                   Integration endpoints (see below)
 ├── lib/                   Shared logic: auth, permissions, pricing, tax, dates, HR,
 │                          notifications, templates, integrations, invoices,
-│                          city-ledger, currency, loyalty, pos, reports
+│                          city-ledger, currency, loyalty, pos, events, reports
 └── admin/
     ├── *-actions.ts       Server actions, one file per area
     ├── login/, security/  Sign-in, 2FA, password
     └── (protected)/       Admin pages:
         dashboard, front-desk, bookings, guests (+ loyalty), groups, tape-chart,
         rooms, housekeeping, maintenance, pos (till, bills, menus), hr, rates,
+        events (diary, quotation, contract, event order, hall & packages),
         companies, reports, night-audit,
         billing (invoices, refunds, city-ledger, currencies), staff, roles,
         settings, audit
@@ -222,6 +224,41 @@ display with `KOT_WEBHOOK_URL`. POS hardware is the hotel's to buy (SOW §2.2); 
 that has already been served.
 - Night audit totals the outlet takings, because a bill settled with cash never touches a folio and would
 otherwise be missing from the day's revenue.
+
+### Events and banquets
+- **One hall, sold several ways.** The hall is a record rather than a constant, carrying its name, floor, area,
+full-day, half-day and hourly rates, its minimum charge, and how long it is held either side of a function for
+dressing and clearing. Each seating plan (theatre, banquet rounds, classroom, U-shape, boardroom, cluster) carries
+its own capacity, and the screen warns when a plan is too small for the head count. Equipment can be tied to a
+space or left to travel between rooms, and only what serves the chosen space is offered.
+- **Catering is quoted per head**, which is how banquet business is actually priced, and the packages are kept
+separate from the restaurant menus. What each package includes prints on the quotation, one line per entry.
+- **The billed head count is the guarantee or the turnout, whichever is higher.** A client who guarantees 100 and
+brings 60 pays for 100; one who brings 120 pays for 120. Closing the event off on the real number reprices the
+catering.
+- **The hall and the food are taxed at their own rates.** In India hall rental is 18% and banquet catering is
+usually 5%, so one function's bill carries more than one rate. `event_tax_bands()` is the single definition of that
+split and is used by the quotation, the invoice and the GST tax summary alike, so the three cannot disagree.
+- **Only a confirmed function holds the hall.** Two enquiries for the same Saturday are ordinary business — the
+hotel quotes several and wins one — so they may overlap and the diary shows them side by side with the days worth
+a telephone call. Confirming a second function over a confirmed one is refused.
+- **A quotation at or above a configurable value needs a second person's approval**, and whoever prepared it may
+not approve it. Repricing a quotation withdraws its approval. Below the threshold no approval is needed at all.
+The SOW puts this with the sales manager, so the **Sales & Marketing** role holds `events.approve` — banquet
+business is sold, not taken at the desk.
+- **Payment terms are recorded on the booking** and print on the quotation and the contract. A corporate client's
+own account terms are filled in by default rather than typed again.
+- **Three documents** print from the same figures: the **quotation** for the client, the **contract** with the
+hotel's own terms and both signatures, and the **banquet event order** for the kitchen, the stewards and the
+technicians — which deliberately carries no prices.
+- **Billing is the main billing module, not a second one.** An event is settled in one of three ways: posted to a
+resident guest's folio (a residential conference, one bill with the rooms), charged to a company on the city ledger
+(where it ages and is chased with their other debt), or invoiced from the property's own GST invoice series — the
+same run of numbers a room invoice takes, because the tax law wants one series for the whole business.
+- **Once an event has been billed its price is fixed.** Changing the head count, the package, the hall charge or
+the discount is refused, for the same reason an issued invoice cannot be edited.
+- Event revenue is reported on its own under **Reports → Financial**, not folded into occupancy, ADR or RevPAR —
+a function is not a room night, and mixing them would spoil all three.
 
 ### Maintenance
 - Any staff member can raise a ticket for a room, an asset or a place, with photos.
@@ -360,6 +397,14 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
       menus**; all seven ship set up, with only the restaurant, mini-bar, room service and laundry open
 - [ ] Confirm every outlet's tax rate and service charge with the accountant, and load the real menus and prices
 - [ ] Decide the outlet charge limit per stay under **Settings** (it ships at no limit)
+- [ ] Set the hall's real rates, its floor, its seating-plan capacities, the per-head catering prices and the
+      equipment hire charges under **Events & banquets → Hall & packages**; everything seeded there is a
+      placeholder and the setup page says so until it is changed
+- [ ] Decide who approves banquet quotations. **Sales & Marketing** and the **General Manager** hold the
+      approval out of the box; give it to whoever actually sells functions
+- [ ] Confirm the hall's and the catering's tax rates with the accountant — they are not the same rate
+- [ ] Agree the quotation approval threshold, the service charge and the deposit percentage under
+      **Settings → Events & banquets**, and write the hotel's function contract terms there
 - [ ] Enter the monthly operating cost under **Settings** if the owner wants GOPPAR reported
 - [ ] Point a daily scheduler at `/api/cron/reports` and set up who receives which report
 - [ ] Add the email and SMS keys, then send a test message
@@ -383,10 +428,15 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
 2. **Reports:** there is no expense ledger, so GOPPAR relies on a monthly operating cost entered by hand.
 3. **POS stock:** recipe and ingredient deduction is out of scope (optional in the SOW), so the outlets sell
    without tracking stock.
-4. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
-5. **Single property only** (Module 14).
-6. **The staff panel is English only.** Languages apply to guest messages.
-7. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
-8. **One lint warning:** `<img>` in the homepage hero.
+4. **Tax summary and cash outlet bills:** the GST tax summary reads folio charges and event bills. An outlet bill
+   settled with cash never touches a folio, so its tax is not in that report — night audit totals the outlet
+   takings separately. Worth closing before the first GST return is filed from this system.
+5. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
+6. **Single property only** (Module 14).
+7. **The staff panel is English only.** Languages apply to guest messages.
+8. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
+9. **Equipment is not held against a date.** How many of each item the hotel owns is shown to whoever is quoting,
+   but with one hall two functions cannot overlap anyway, so no conflict check is enforced.
+10. **One lint warning:** `<img>` in the homepage hero.
 
 **Room rates** are managed under **Admin → Rates**. The published tariff is also kept in `app/lib/rates-fallback.ts` as a fallback for the website; keep the two in step.

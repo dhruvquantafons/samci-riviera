@@ -61,6 +61,10 @@ export const DEFAULT_SETTINGS: PropertySettings = {
   loyalty_expiry_months: 24,
   loyalty_min_redeem_points: 500,
   pos_room_charge_limit: 0,
+  event_quote_approval_threshold: 100000,
+  event_service_charge_percent: 0,
+  event_advance_percent: 25,
+  event_terms: "",
   monthly_operating_cost: 0,
   updated_at: new Date(0).toISOString(),
 };

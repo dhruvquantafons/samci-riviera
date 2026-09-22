@@ -36,19 +36,24 @@ export default async function FinancialReportsPage({
   const payments = reportByKind("payments")!;
   const outletSales = reportByKind("outlet_sales")!;
   const outletPayments = reportByKind("outlet_payments")!;
+  const events = reportByKind("events")!;
   const outstanding = reportByKind("outstanding")!;
 
-  const [taxRows, payRows, outletRows, outletPayRows, owedRows, { data: ledgerRows }] = await Promise.all([
-    runReport(supabase, tax, range),
-    runReport(supabase, payments, range),
-    runReport(supabase, outletSales, range),
-    runReport(supabase, outletPayments, range),
-    runReport(supabase, outstanding, range),
-    supabase.from("city_ledger_entries").select("*").order("created_at"),
-  ]);
+  const [taxRows, payRows, outletRows, outletPayRows, eventRows, owedRows, { data: ledgerRows }] =
+    await Promise.all([
+      runReport(supabase, tax, range),
+      runReport(supabase, payments, range),
+      runReport(supabase, outletSales, range),
+      runReport(supabase, outletPayments, range),
+      runReport(supabase, events, range),
+      runReport(supabase, outstanding, range),
+      supabase.from("city_ledger_entries").select("*").order("created_at"),
+    ]);
 
   const taxTotal = taxRows.rows.reduce((s, r) => s + Number(r.tax ?? 0), 0);
   const outletTotal = outletRows.rows.reduce((s, r) => s + Number(r.total ?? 0), 0);
+  const eventTotal = eventRows.rows.reduce((s, r) => s + Number(r.total ?? 0), 0);
+  const eventCount = eventRows.rows.reduce((s, r) => s + Number(r.events ?? 0), 0);
   const guestOwed = owedRows.rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
 
   // Corporate receivables, aged by the city ledger's own rules.
@@ -74,7 +79,11 @@ export default async function FinancialReportsPage({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label={`${settings.tax_label} charged`} value={fmtMoney(taxTotal)} hint="In this period" />
         <StatCard label="Outlet takings" value={fmtMoney(outletTotal)} hint={`${outletRows.rows.length} outlet(s)`} />
+        <StatCard label="Event revenue" value={fmtMoney(eventTotal)} hint={`${eventCount} function(s)`} />
         <StatCard label="Owed by guests" value={fmtMoney(guestOwed)} hint={`${owedRows.rows.length} stay(s)`} />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Owed by companies"
           value={fmtMoney(aging.total)}
@@ -92,6 +101,7 @@ export default async function FinancialReportsPage({
         to={range.to}
         error={outletPayRows.error}
       />
+      <ReportTable definition={events} rows={eventRows.rows} from={range.from} to={range.to} error={eventRows.error} />
       <ReportTable definition={outstanding} rows={owedRows.rows} from={range.from} to={range.to} error={owedRows.error} />
 
       {/* ── Corporate receivables ── */}

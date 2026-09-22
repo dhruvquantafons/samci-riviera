@@ -193,6 +193,57 @@ export default async function SettingsPage() {
         </Card>
 
         <Card className="p-5 space-y-4">
+          <SectionTitle>Events &amp; banquets</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field
+              label="Quotation approval above (₹)"
+              hint="A quotation at or above this needs a second person's approval. 0 = every quotation does."
+            >
+              <input
+                type="number"
+                name="event_quote_approval_threshold"
+                min={0}
+                step="0.01"
+                defaultValue={s.event_quote_approval_threshold}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Service charge (%)" hint="Added to every event and taxed at the hall's own rate. 0 = none.">
+              <input
+                type="number"
+                name="event_service_charge_percent"
+                min={0}
+                max={100}
+                step="0.01"
+                defaultValue={s.event_service_charge_percent}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Deposit asked for (%)" hint="Shown on the quotation and the contract as what holds the date.">
+              <input
+                type="number"
+                name="event_advance_percent"
+                min={0}
+                max={100}
+                step="0.01"
+                defaultValue={s.event_advance_percent}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <Field
+            label="Function contract terms"
+            hint="Printed on every function contract: cancellation terms, the head-count deadline, what damage is charged for."
+          >
+            <textarea name="event_terms" rows={4} defaultValue={s.event_terms} className={inputClass} />
+          </Field>
+          <Notice tone="info">
+            The hall&apos;s own rates, its seating plans, the per-head catering packages and the equipment list are
+            maintained under <strong>Events &amp; banquets → Hall &amp; packages</strong>, not here.
+          </Notice>
+        </Card>
+
+        <Card className="p-5 space-y-4">
           <SectionTitle>Security &amp; data</SectionTitle>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <Field label="Sign out after idle (minutes)">

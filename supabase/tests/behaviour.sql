@@ -834,3 +834,145 @@ insert into report_schedules (name, report, frequency, recipients)
 values ('Sneaky', 'daily_revenue', 'daily', 'hk@example.com');
 select count(*) as hk_sees_schedules_expect_0 from report_schedules;
 reset role;
+
+-- ── Module 10: banquets, conferences and events ─────────────────────────────
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+\echo '--- price the hall and a per-head package the way the hotel would'
+update event_spaces   set rental_full_day = 25000, tax_rate = 18 where code = 'HALL';
+update event_packages set price_per_head = 1200, tax_rate = 5     where code = 'CONF-FD';
+
+\echo '--- the space carries its floor and the three seating styles the SOW names'
+update event_spaces set floor = 1 where code = 'HALL';
+select name, capacity from event_layouts
+ where space_id = (select id from event_spaces where code = 'HALL')
+   and name in ('Theatre', 'Classroom', 'Banquet (round tables)')
+ order by name;
+
+\echo '--- equipment tied to a space is only offered there; the rest travels'
+update event_equipment set space_id = (select id from event_spaces where code = 'HALL')
+ where name = 'Stage backdrop';
+select count(*) as travels_expect_7 from event_equipment where space_id is null;
+
+\echo '--- take an enquiry: a full-day conference for 80 guaranteed'
+insert into event_bookings (number, financial_year, seq, space_id, layout_id, title, event_type,
+  contact_name, event_date, start_time, end_time, setup_from, teardown_to,
+  pax_expected, pax_guaranteed, package_id, rental_basis, created_by)
+select 'EVT/2026-27/0001', '2026-27', 1, s.id,
+       (select id from event_layouts where space_id = s.id and name = 'U-shape'),
+       'Kashmir Trade Conference', 'conference', 'Bilal Khan',
+       current_date + 20, '09:00', '18:00', '08:00', '19:00',
+       80, 80, (select id from event_packages where code = 'CONF-FD'), 'full_day',
+       '00000000-0000-0000-0000-000000000001'
+  from event_spaces s where s.code = 'HALL';
+
+\echo '--- payment terms are recorded against the booking'
+update event_bookings
+   set payment_terms = '50% deposit on signing, balance seven days before the event.'
+ where number = 'EVT/2026-27/0001';
+select payment_terms <> '' as terms_recorded from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- the hall and the food are taxed at their own rates: EXPECT 18% on 25000, 5% on 96000, grand 130300'
+select rental_net, rental_tax, catering_net, catering_tax, grand_total, tax_breakdown
+  from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- add a projector: EXPECT it joins the hall in the 18% band, grand 133840'
+insert into event_lines (event_id, kind, description, qty, unit_price, tax_rate)
+select id, 'equipment', 'Projector and screen', 1, 3000, 18
+  from event_bookings where number = 'EVT/2026-27/0001';
+select equipment_net, equipment_tax, grand_total from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- 10% service charge and a 10% discount: EXPECT grand 133624.80, discount 12400'
+update property_settings set event_service_charge_percent = 10;
+update event_bookings set discount_percent = 10 where number = 'EVT/2026-27/0001';
+select service_net, service_tax, discount_amount, net_total, tax_total, grand_total, tax_breakdown
+  from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- the guarantee is what is billed, not the turnout: EXPECT 80'
+select event_billable_pax(id) as billable_pax_expect_80 from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- confirm before quoting: EXPECT EVENT_NOT_QUOTED'
+select event_confirm(id) from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- quote it: EXPECT approval_required t, above the 100000 threshold'
+select event_submit_quote(id) from event_bookings where number = 'EVT/2026-27/0001';
+select status, approval_required from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- confirm before approval: EXPECT EVENT_NEEDS_APPROVAL'
+select event_confirm(id) from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- the person who prepared it approves it: EXPECT EVENT_SELF_APPROVAL'
+select event_approve_quote(id) from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- the sales manager is who the SOW puts the approval with, and holds it'
+select has_permission('events.approve') as admin_may_approve from (select 1) x;
+select count(*) as sales_manager_approve_expect_1
+  from role_permissions where role_key = 'sales_marketing' and permission = 'events.approve';
+
+\echo '--- prepared by someone else, so the approval and the confirmation stand'
+update event_bookings set quoted_by = '00000000-0000-0000-0000-000000000002' where number = 'EVT/2026-27/0001';
+select event_approve_quote(id) from event_bookings where number = 'EVT/2026-27/0001';
+select event_confirm(id) from event_bookings where number = 'EVT/2026-27/0001';
+select status, approved_by is not null as approved, confirmed_at is not null as confirmed
+  from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- a second enquiry for the same hall and day is ordinary business, not a clash'
+insert into event_bookings (number, financial_year, seq, space_id, title, contact_name,
+  event_date, start_time, end_time, setup_from, teardown_to, pax_expected, created_by)
+select 'EVT/2026-27/0002', '2026-27', 2, s.id, 'Wedding Reception', 'Aisha Wani',
+       current_date + 20, '19:30', '23:00', '17:00', '23:30', 150,
+       '00000000-0000-0000-0000-000000000001'
+  from event_spaces s where s.code = 'HALL';
+select count(*) as events_on_the_day_expect_2 from event_bookings where event_date = current_date + 20;
+
+\echo '--- but only one of them may hold the hall: EXPECT EVENT_SPACE_CLASH'
+update event_bookings set status = 'quoted', quoted_at = now() where number = 'EVT/2026-27/0002';
+select event_confirm(id) from event_bookings where number = 'EVT/2026-27/0002';
+
+\echo '--- a deposit of 25%: EXPECT 100218.60 left owing'
+select event_take_payment(id, 'advance', 'bank_transfer', 33406.20, 'NEFT-9911') is not null as took_deposit
+  from event_bookings where number = 'EVT/2026-27/0001';
+select event_balance(id) as owing_expect_100218_60 from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- taking more than is owed: EXPECT EVENT_OVERPAYMENT'
+select event_take_payment(id, 'payment', 'cash', 200000) from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- bill the rest to a company: the charge ages on the city ledger like any other'
+update companies set credit_limit = null where name = 'Dal Travels';
+select event_to_city_ledger(id, (select id from companies where name = 'Dal Travels')) is not null as billed
+  from event_bookings where number = 'EVT/2026-27/0001';
+select event_balance(id) as owing_expect_0 from event_bookings where number = 'EVT/2026-27/0001';
+select kind, amount, due_date is not null as falls_due from city_ledger_entries where event_id is not null;
+
+\echo '--- billing it again: EXPECT EVENT_NOTHING_OWED'
+select event_to_city_ledger(id, (select id from companies where name = 'Dal Travels'))
+  from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- repricing a billed event: EXPECT EVENT_ALREADY_BILLED'
+update event_bookings set pax_guaranteed = 120 where number = 'EVT/2026-27/0001';
+
+\echo '--- and adding a charge to it: EXPECT EVENT_ALREADY_BILLED'
+insert into event_lines (event_id, kind, description, qty, unit_price, tax_rate)
+select id, 'decor', 'Stage flowers', 1, 5000, 18 from event_bookings where number = 'EVT/2026-27/0001';
+
+\echo '--- the GST return picks the event up: EXPECT 5% on 86400 and 18% on 36360'
+select rate, net, tax from report_tax_summary(current_date + 20, current_date + 20);
+
+\echo '--- event revenue is reported on its own, not folded into ADR'
+select event_type, events, pax, rental, catering, equipment, service, total
+  from report_events(current_date, current_date + 60);
+
+\echo '--- a housekeeper may not see the events diary: EXPECT 0'
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+set role authenticated;
+select count(*) as hk_sees_events_expect_0 from event_bookings;
+
+\echo '--- nor take an enquiry: EXPECT row-level security'
+insert into event_bookings (number, financial_year, seq, space_id, title, contact_name,
+  event_date, start_time, end_time, setup_from, teardown_to, pax_expected)
+select 'EVT/2026-27/0003', '2026-27', 3, s.id, 'Sneaky', 'Nobody',
+       current_date + 40, '10:00', '12:00', '10:00', '12:00', 10 from event_spaces s limit 1;
+reset role;
