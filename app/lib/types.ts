@@ -473,8 +473,10 @@ export interface Invoice {
   series: string;
   financial_year: string;
   seq: number;
-  booking_id: string;
-  folio_id: string;
+  /** Null on an event invoice, which belongs to an event rather than a stay. */
+  booking_id: string | null;
+  folio_id: string | null;
+  event_id: string | null;
   bill_to_name: string;
   bill_to_address: string;
   bill_to_gstin: string;
@@ -495,6 +497,8 @@ export interface Invoice {
   fx_currency: string | null;
   fx_rate: number | null;
   bookings?: Pick<Booking, "reference" | "check_in" | "check_out"> | null;
+  /** Joined on an event invoice, which has a function rather than a stay. */
+  event_bookings?: { number: string; title: string; event_date: string } | null;
 }
 
 export type PaymentTxStatus = "created" | "paid" | "cancelled" | "expired" | "failed" | "refunded";
@@ -614,6 +618,10 @@ export interface PropertySettings {
   loyalty_expiry_months: number;
   loyalty_min_redeem_points: number;
   pos_room_charge_limit: number;
+  event_quote_approval_threshold: number;
+  event_service_charge_percent: number;
+  event_advance_percent: number;
+  event_terms: string;
   monthly_operating_cost: number;
   updated_at: string;
 }
@@ -1349,5 +1357,245 @@ export interface ReportSchedule {
   is_active: boolean;
   last_sent_at: string | null;
   last_status: string;
+  created_at: string;
+}
+
+
+// ── Module 10: Banquets, conferences and events ─────────────────────────────
+
+export interface EventSpace {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  floor: number | null;
+  area_sqft: number | null;
+  rental_full_day: number;
+  rental_half_day: number;
+  rental_per_hour: number;
+  min_charge: number;
+  tax_rate: number;
+  setup_minutes: number;
+  teardown_minutes: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface EventLayout {
+  id: string;
+  space_id: string;
+  name: string;
+  capacity: number;
+  notes: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type MealPeriod = "breakfast" | "lunch" | "hi_tea" | "dinner" | "full_day" | "custom";
+
+export const MEAL_PERIOD_LABELS: Record<MealPeriod, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  hi_tea: "Hi-tea",
+  dinner: "Dinner",
+  full_day: "Full day",
+  custom: "Other",
+};
+
+export interface EventPackage {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  meal_period: MealPeriod;
+  price_per_head: number;
+  tax_rate: number;
+  min_pax: number;
+  inclusions: string[];
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface EventEquipment {
+  id: string;
+  /** Null when the item travels between spaces rather than living in one. */
+  space_id: string | null;
+  name: string;
+  description: string;
+  unit: string;
+  rental_price: number;
+  tax_rate: number;
+  qty_available: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type EventType =
+  | "conference"
+  | "residential_conference"
+  | "corporate_meeting"
+  | "training"
+  | "wedding"
+  | "reception"
+  | "banquet"
+  | "birthday"
+  | "exhibition"
+  | "other";
+
+export const EVENT_TYPE_LABELS: Record<EventType, string> = {
+  conference: "Conference",
+  residential_conference: "Residential conference",
+  corporate_meeting: "Corporate meeting",
+  training: "Training",
+  wedding: "Wedding",
+  reception: "Reception",
+  banquet: "Banquet",
+  birthday: "Birthday",
+  exhibition: "Exhibition",
+  other: "Other",
+};
+
+export type EventStatus = "enquiry" | "quoted" | "confirmed" | "completed" | "cancelled";
+
+export const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
+  enquiry: "Enquiry",
+  quoted: "Quoted",
+  confirmed: "Confirmed",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export type RentalBasis = "full_day" | "half_day" | "hourly" | "custom" | "waived";
+
+export const RENTAL_BASIS_LABELS: Record<RentalBasis, string> = {
+  full_day: "Full day",
+  half_day: "Half day",
+  hourly: "By the hour",
+  custom: "Agreed amount",
+  waived: "No hall charge",
+};
+
+export interface EventBooking {
+  id: string;
+  number: string;
+  financial_year: string;
+  seq: number;
+  space_id: string;
+  layout_id: string | null;
+  title: string;
+  event_type: EventType;
+  guest_id: string | null;
+  company_id: string | null;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+  payment_terms: string;
+  booking_id: string | null;
+  event_date: string;
+  start_time: string;
+  end_time: string;
+  setup_from: string;
+  teardown_to: string;
+  pax_expected: number;
+  pax_guaranteed: number;
+  pax_actual: number | null;
+  package_id: string | null;
+  menu_notes: string;
+  rental_basis: RentalBasis;
+  rental_hours: number;
+  rental_override: number | null;
+  discount_percent: number;
+  rental_net: number;
+  rental_tax: number;
+  catering_net: number;
+  catering_tax: number;
+  equipment_net: number;
+  equipment_tax: number;
+  other_net: number;
+  other_tax: number;
+  service_net: number;
+  service_tax: number;
+  discount_amount: number;
+  net_total: number;
+  tax_total: number;
+  grand_total: number;
+  tax_breakdown: TaxBand[];
+  status: EventStatus;
+  quoted_at: string | null;
+  quoted_by: string | null;
+  approval_required: boolean;
+  approved_at: string | null;
+  approved_by: string | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  contract_signed_on: string | null;
+  contract_signed_name: string;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string;
+  beo_setup_notes: string;
+  beo_service_notes: string;
+  beo_av_notes: string;
+  notes: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Joined for the diary and the documents. */
+  event_spaces?: Pick<EventSpace, "name" | "code" | "tax_rate"> | null;
+  event_layouts?: Pick<EventLayout, "name" | "capacity"> | null;
+  event_packages?: Pick<EventPackage, "name" | "price_per_head" | "tax_rate" | "inclusions"> | null;
+  companies?: Pick<Company, "name" | "gstin" | "billing_address"> | null;
+  guests?: Pick<Guest, "full_name" | "phone" | "email"> | null;
+  bookings?: Pick<Booking, "reference" | "check_in" | "check_out"> | null;
+}
+
+export type EventLineKind = "equipment" | "food_extra" | "decor" | "other";
+
+export const EVENT_LINE_KIND_LABELS: Record<EventLineKind, string> = {
+  equipment: "Equipment",
+  food_extra: "Food and drink",
+  decor: "Decor",
+  other: "Other",
+};
+
+export interface EventLine {
+  id: string;
+  event_id: string;
+  kind: EventLineKind;
+  equipment_id: string | null;
+  description: string;
+  qty: number;
+  unit_price: number;
+  tax_rate: number;
+  net_amount: number;
+  tax_amount: number;
+  sort_order: number;
+  created_at: string;
+}
+
+export type EventPaymentKind = "advance" | "payment" | "refund" | "room_charge" | "company_account";
+
+export const EVENT_PAYMENT_KIND_LABELS: Record<EventPaymentKind, string> = {
+  advance: "Deposit",
+  payment: "Payment",
+  refund: "Refund",
+  room_charge: "Billed to a room",
+  company_account: "Billed to a company",
+};
+
+export interface EventPayment {
+  id: string;
+  event_id: string;
+  kind: EventPaymentKind;
+  amount: number;
+  method: PaymentMethod | null;
+  reference: string;
+  notes: string;
+  booking_id: string | null;
+  folio_id: string | null;
+  city_ledger_entry_id: string | null;
+  voided_at: string | null;
+  void_reason: string;
   created_at: string;
 }

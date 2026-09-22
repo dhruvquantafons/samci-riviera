@@ -335,6 +335,10 @@ export async function saveSettings(_prev: ActionState, fd: FormData): Promise<Ac
       multi_currency_enabled: bool(fd, "multi_currency_enabled"),
       ar_reminder_days: int(fd, "ar_reminder_days", 7, 0, 180),
       pos_room_charge_limit: Math.max(0, num(fd, "pos_room_charge_limit") ?? 0),
+      event_quote_approval_threshold: Math.max(0, num(fd, "event_quote_approval_threshold") ?? 100000),
+      event_service_charge_percent: Math.min(100, Math.max(0, num(fd, "event_service_charge_percent") ?? 0)),
+      event_advance_percent: Math.min(100, Math.max(0, num(fd, "event_advance_percent") ?? 25)),
+      event_terms: str(fd, "event_terms", 4000),
       monthly_operating_cost: Math.max(0, num(fd, "monthly_operating_cost") ?? 0),
     })
     .eq("id", true);

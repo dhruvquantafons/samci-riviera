@@ -67,6 +67,17 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    module: "Events & banquets",
+    permissions: [
+      { key: "events.view", label: "View the events diary and event orders" },
+      { key: "events.book", label: "Take enquiries, confirm and cancel events" },
+      { key: "events.quote", label: "Prepare and send quotations" },
+      { key: "events.approve", label: "Approve quotations above the threshold" },
+      { key: "events.bill", label: "Take deposits and bill events" },
+      { key: "events.manage", label: "Manage spaces, layouts, catering packages and equipment" },
+    ],
+  },
+  {
     module: "Rooms",
     permissions: [
       { key: "rooms.view", label: "View the room board" },
