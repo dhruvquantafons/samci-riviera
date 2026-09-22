@@ -102,6 +102,11 @@ export default async function FolioPrintPage({ params }: { params: Promise<{ id:
                   <td className="py-1.5">
                     {e.description}
                     {e.method && ` (${PAYMENT_METHOD_LABELS[e.method]})`}
+                    {e.fx_currency && e.fx_amount !== null && (
+                      <span className="block text-[10px] text-slate-500">
+                        {e.fx_currency} {Number(e.fx_amount).toLocaleString("en-IN")} at {Number(e.fx_rate)} per unit
+                      </span>
+                    )}
                   </td>
                   <td className="py-1.5 text-right">
                     {credit ? "−" : ""}

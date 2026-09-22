@@ -332,6 +332,8 @@ export async function saveSettings(_prev: ActionState, fd: FormData): Promise<Ac
       invoice_terms: str(fd, "invoice_terms", 1000),
       refund_approval_threshold: Math.max(0, num(fd, "refund_approval_threshold") ?? 5000),
       online_payments_enabled: bool(fd, "online_payments_enabled"),
+      multi_currency_enabled: bool(fd, "multi_currency_enabled"),
+      ar_reminder_days: int(fd, "ar_reminder_days", 7, 0, 180),
     })
     .eq("id", true);
   if (error) return { error: friendlyDbError(error.message) };

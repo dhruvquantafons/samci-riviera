@@ -148,6 +148,13 @@ export async function eraseGuest(_prev: ActionState, fd: FormData): Promise<Acti
 
   const { error } = await supabase.rpc("erase_guest", { p_guest: id });
   if (error) return { error: friendlyDbError(error.message) };
+
+  // The loyalty membership and its points history are personal data too, so
+  // they go with the erase. The folio lines a redemption produced are
+  // financial record and stay.
+  const { error: loyaltyError } = await supabase.rpc("loyalty_erase", { p_guest: id });
+  if (loyaltyError) return { error: friendlyDbError(loyaltyError.message) };
+
   revalidateGuest(id);
   return { success: "Personal data erased. Stays and amounts are kept for tax records." };
 }

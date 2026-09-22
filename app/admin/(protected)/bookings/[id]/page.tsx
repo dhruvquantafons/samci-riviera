@@ -14,9 +14,11 @@ import { hoursUntil, todayIn } from "../../../../lib/dates";
 import type {
   AuditEntry,
   Booking,
+  Currency,
   Folio,
   GuestRequest,
   Invoice,
+  LoyaltyTier,
   PaymentTransaction,
   RatePlan,
   Room,
@@ -62,6 +64,7 @@ import ActionForm from "../../../components/ActionForm";
 import LiveRefresh from "../../../components/LiveRefresh";
 import FolioPanel from "./FolioPanel";
 import BillingPanel from "./BillingPanel";
+import SettlementPanel from "./SettlementPanel";
 import EditBookingForm from "./EditBookingForm";
 
 type FullBooking = Booking & { rate_plans: RatePlan | null; booking_groups: { id: string; reference: string; name: string } | null };
@@ -83,7 +86,7 @@ export default async function BookingDetailPage({
   const { data } = await supabase
     .from("bookings")
     .select(
-      "*, guests(id, full_name, email, phone, tags, blacklist_reason), room_types(id, name), rooms(id, room_number), rate_plans(*), companies(id, name), booking_groups(id, reference, name)",
+      "*, guests(id, full_name, email, phone, tags, blacklist_reason, loyalty_opt_in, loyalty_member_no, loyalty_tier), room_types(id, name), rooms(id, room_number), rate_plans(*), companies(id, name), booking_groups(id, reference, name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -110,6 +113,9 @@ export default async function BookingDetailPage({
     { data: folios },
     { data: invoices },
     { data: payments },
+    { data: currencyRows },
+    { data: loyaltyTierRows },
+    { data: pointsBalance },
   ] = await Promise.all([
     supabase.from("room_types").select("*").order("sort_order"),
     supabase.from("rate_plans").select("*").order("sort_order"),
@@ -153,6 +159,11 @@ export default async function BookingDetailPage({
       .eq("booking_id", id)
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase.from("currencies").select("*").eq("is_active", true).order("code"),
+    supabase.from("loyalty_tiers").select("*").order("sort_order"),
+    booking.guest_id
+      ? supabase.rpc("loyalty_balance", { p_guest: booking.guest_id })
+      : Promise.resolve({ data: 0 }),
   ]);
 
   const plan = booking.rate_plans;
@@ -660,6 +671,27 @@ export default async function BookingDetailPage({
                 canInvoice={can(session, "folio.invoice")}
                 canPay={can(session, "folio.payment")}
                 canAdjust={can(session, "folio.adjust")}
+              />
+              <SettlementPanel
+                bookingId={id}
+                guestId={booking.guest_id}
+                guestName={booking.contact_name}
+                memberNo={booking.guests?.loyalty_member_no ?? null}
+                folios={(folios ?? []) as Folio[]}
+                entries={folio.entries}
+                companies={companies}
+                currencies={(currencyRows ?? []) as Currency[]}
+                baseCurrency={settings.currency}
+                multiCurrency={settings.multi_currency_enabled}
+                tiers={(loyaltyTierRows ?? []) as LoyaltyTier[]}
+                tierKey={booking.guests?.loyalty_opt_in ? (booking.guests?.loyalty_tier ?? null) : null}
+                pointsBalance={Number(pointsBalance ?? 0)}
+                minRedeem={settings.loyalty_min_redeem_points}
+                programName={settings.loyalty_program_name}
+                loyaltyEnabled={settings.loyalty_enabled}
+                canCityLedger={can(session, "folio.city_ledger")}
+                canPay={can(session, "folio.payment")}
+                canRedeem={can(session, "loyalty.redeem")}
               />
             </div>
           )}

@@ -4,7 +4,19 @@ import { ArrowLeft, Cake, Heart } from "lucide-react";
 import { createClient } from "../../../../lib/supabase/server";
 import { requirePermission } from "../../../../lib/auth";
 import { can } from "../../../../lib/permissions";
-import type { Booking, Company, Guest, GuestFeedback, GuestStats, RoomType } from "../../../../lib/types";
+import { getSettings } from "../../../../lib/settings";
+import { todayIn } from "../../../../lib/dates";
+import type {
+  Booking,
+  Company,
+  Guest,
+  GuestFeedback,
+  GuestStats,
+  LoyaltyTier,
+  LoyaltyTierChange,
+  LoyaltyTransaction,
+  RoomType,
+} from "../../../../lib/types";
 import { ID_TYPE_LABELS, LANGUAGES, guestTags } from "../../../../lib/types";
 import { eraseGuest, mergeGuests, recordFeedback, updateGuestProfile } from "../../../guest-actions";
 import {
@@ -26,6 +38,7 @@ import {
 } from "../../../components/ui";
 import ActionForm from "../../../components/ActionForm";
 import { GuestTags, phoneKey } from "../shared";
+import LoyaltyPanel from "./LoyaltyPanel";
 
 type Stay = Pick<Booking, "id" | "reference" | "check_in" | "check_out" | "status" | "total_amount" | "special_requests" | "rooms_count"> & {
   room_types: { name: string } | null;
@@ -63,7 +76,21 @@ export default async function GuestProfilePage({
   if (!data) notFound();
   const guest = data as Guest;
 
-  const [{ data: statRow }, { data: stayRows }, { data: fb }, { data: identity }, { data: types }, { data: companies }] = await Promise.all([
+  const settings = await getSettings();
+  const today = todayIn(settings.timezone);
+
+  const [
+    { data: statRow },
+    { data: stayRows },
+    { data: fb },
+    { data: identity },
+    { data: types },
+    { data: companies },
+    { data: tierRows },
+    { data: loyaltyRows },
+    { data: tierHistory },
+    { data: activity },
+  ] = await Promise.all([
     supabase.from("guest_stats").select("*").eq("guest_id", id).maybeSingle(),
     supabase
       .from("bookings")
@@ -74,6 +101,19 @@ export default async function GuestProfilePage({
     supabase.rpc("guest_identity_masked", { p_guest: id }),
     supabase.from("room_types").select("id, name").order("sort_order"),
     supabase.from("companies").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("loyalty_tiers").select("*").order("sort_order"),
+    supabase
+      .from("loyalty_transactions")
+      .select("*, bookings(reference)")
+      .eq("guest_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("loyalty_tier_history")
+      .select("*")
+      .eq("guest_id", id)
+      .order("changed_at", { ascending: false })
+      .limit(20),
+    supabase.rpc("loyalty_rolling_activity", { p_guest: id, p_date: today }),
   ]);
   const stats = statRow as GuestStats | null;
   const stays = (stayRows ?? []) as unknown as Stay[];
@@ -85,6 +125,12 @@ export default async function GuestProfilePage({
   const submitted = feedback.filter((f) => f.submitted_at);
   const avg = submitted.length ? (submitted.reduce((s, f) => s + (f.overall ?? 0), 0) / submitted.length).toFixed(1) : null;
   const unratedStays = stays.filter((s) => s.status === "checked_out" && !feedback.some((f) => f.booking_id === s.id && f.submitted_at));
+
+  const tiers = (tierRows ?? []) as LoyaltyTier[];
+  const loyalty = (loyaltyRows ?? []) as LoyaltyTransaction[];
+  const tierChanges = (tierHistory ?? []) as LoyaltyTierChange[];
+  // loyalty_rolling_activity returns a single row of nights and spend.
+  const rolling = ((activity as { nights: number; spend: number }[] | null) ?? [])[0] ?? { nights: 0, spend: 0 };
 
   // Likely duplicates to merge into this profile.
   let duplicates: Pick<Guest, "id" | "full_name" | "email" | "phone">[] = [];
@@ -246,6 +292,22 @@ export default async function GuestProfilePage({
           )}
         </dl>
       </Card>
+
+      <LoyaltyPanel
+        guest={guest}
+        tiers={tiers}
+        transactions={loyalty}
+        history={tierChanges}
+        nights={Number(rolling.nights ?? 0)}
+        spend={Number(rolling.spend ?? 0)}
+        programName={settings.loyalty_program_name}
+        enabled={settings.loyalty_enabled}
+        minRedeem={settings.loyalty_min_redeem_points}
+        expiryMonths={settings.loyalty_expiry_months}
+        today={today}
+        canEdit={edit}
+        canManage={can(session, "loyalty.manage") && !guest.erased_at}
+      />
 
       <Card>
         <div className="px-4 pt-4">

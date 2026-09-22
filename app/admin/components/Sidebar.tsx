@@ -80,7 +80,7 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
         href: "/admin/billing/invoices",
         label: "Billing",
         icon: ReceiptIndianRupee,
-        any: ["folio.invoice", "folio.refund_approve"],
+        any: ["folio.invoice", "folio.refund_approve", "folio.city_ledger"],
       },
       { href: "/admin/companies", label: "Companies", icon: Building2, any: ["companies.manage"] },
     ],

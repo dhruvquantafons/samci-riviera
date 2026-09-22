@@ -140,6 +140,26 @@ export default async function SettingsPage() {
               />
             </div>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field label="Chase accounts overdue by (days)" hint="Used by the city ledger chase list.">
+              <input
+                type="number"
+                name="ar_reminder_days"
+                min={0}
+                max={180}
+                defaultValue={s.ar_reminder_days}
+                className={inputClass}
+              />
+            </Field>
+            <div className="pt-6 sm:col-span-2">
+              <Check
+                name="multi_currency_enabled"
+                defaultChecked={s.multi_currency_enabled}
+                label="Let the desk take payment in another currency"
+                hint="Rates are maintained under Billing → Currencies. Amounts are always stored in the property's own currency."
+              />
+            </div>
+          </div>
           <Field label="Invoice terms" hint="Printed at the foot of every invoice.">
             <textarea name="invoice_terms" rows={2} defaultValue={s.invoice_terms} className={inputClass} />
           </Field>

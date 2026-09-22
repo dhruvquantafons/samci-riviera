@@ -34,11 +34,11 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 2 | Front desk (check-in / check-out) | ✅ Done |
 | 3 | Rooms, rates & inventory | ✅ Done |
 | 5 | Housekeeping | ✅ Done |
+| 7 | Billing, invoicing, folio & payments | ✅ Done |
+| 8 | Guest CRM & loyalty | ✅ Done |
 | 11 | Maintenance / engineering | ✅ Done |
 | 12 | HR & staff | ✅ Done |
 | 15 | Roles, permissions & administration | ✅ Done |
-| 7 | Billing, invoicing, folio & payments | 🟡 Core done: split folios, GST invoices, online payments, refund approval. City ledger and multi-currency remain |
-| 8 | Guest CRM | 🟡 Done except loyalty points and tiers |
 | 13 | Reports | 🟡 Dashboard and night-audit report only |
 | 16 | Notifications | 🟡 Booking messages and editable templates only |
 | 17 | Guest booking portal | 🟡 Search, live price and booking request; no online payment or guest accounts |
@@ -49,7 +49,7 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 14 | Multi-property | ⬜ Not started |
 | 18 | Mobile apps | ⬜ Not started (key staff screens already work on phones) |
 
-Loyalty points and tiers (Module 8) depend on the billing ledger and are the next piece of work.
+Modules 4, 6, 9, 10, 14 and 18 are the remaining work.
 
 ---
 
@@ -92,6 +92,8 @@ Open <http://localhost:3000>. The public site works without any keys. The admin 
 | `0012_hr.sql` | HR profiles, shifts, roster, attendance, leave |
 | `0013_guest_crm_and_admin.sql` | Guest profiles, feedback, merge & erase; message templates, languages, sessions |
 | `0014_billing.sql` | Split folios, GST invoice numbering, gateway payments, refund approval |
+| `0015_city_ledger_and_currency.sql` | City ledger (corporate A/R), exchange rates, foreign-currency settlement |
+| `0016_loyalty.sql` | Loyalty tiers, points lots, redemption, expiry, tier history |
 
 Migrations upgrade an existing database in place; existing data is kept.
 
@@ -128,10 +130,13 @@ npm run dev      # development server
 npm run build    # production build
 npm start        # serve the production build
 npm run lint     # ESLint
-npm test         # unit tests (pricing, tax, penalties, room assignment, passwords, HR, templates)
+npm test         # unit tests (pricing, tax, penalties, room assignment, passwords, HR, templates,
+                 #             invoices, city-ledger aging, currency conversion, loyalty points)
 ```
 
-Database tests apply every migration to a throwaway local Postgres and check behaviour: overbooking, permissions, housekeeping, maintenance, HR and guest records.
+Database tests apply every migration to a throwaway local Postgres and check behaviour: overbooking,
+permissions, housekeeping, maintenance, HR, guest records, invoice immutability, refund approval, city
+ledger transfers and credit limits, and loyalty earning, redemption and expiry.
 
 ```bash
 PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres supabase/tests/run.sh
@@ -152,14 +157,16 @@ app/
 ├── feedback/[token]/      Guest feedback form (link in the final bill email)
 ├── api/                   Integration endpoints (see below)
 ├── lib/                   Shared logic: auth, permissions, pricing, tax, dates, HR,
-│                          notifications, templates, integrations
+│                          notifications, templates, integrations, invoices,
+│                          city-ledger, currency, loyalty
 └── admin/
     ├── *-actions.ts       Server actions, one file per area
     ├── login/, security/  Sign-in, 2FA, password
     └── (protected)/       Admin pages:
-        dashboard, front-desk, bookings, guests, groups, tape-chart, rooms,
-        housekeeping, maintenance, hr, rates, companies, night-audit,
-        staff, roles, settings, audit
+        dashboard, front-desk, bookings, guests (+ loyalty), groups, tape-chart,
+        rooms, housekeeping, maintenance, hr, rates, companies, night-audit,
+        billing (invoices, refunds, city-ledger, currencies), staff, roles,
+        settings, audit
 ```
 
 ---
@@ -173,7 +180,8 @@ app/
 - **Website bookings** show live availability and prices. The guest picks a rate plan and sends a request, which is held as *tentative* (or *waitlisted* if full) for the desk to confirm.
 - **Check-in** needs an inspected room, government ID, a signed registration card and the deposit.
 - **Check-out** settles the bill and can email it.
-- **Night audit** posts the night's room charges, marks no-shows, and moves the business date forward.
+- **Night audit** posts the night's room charges, marks no-shows, retires expired loyalty points,
+re-checks every member's tier, and moves the business date forward.
 
 ### Billing and invoicing
 - **Folios:** every stay starts with one master bill. The desk can open more — "Company", "Extras" — and move charges between them, so one stay can be billed to more than one payer.
@@ -207,8 +215,25 @@ app/
 - **Feedback:** requested with the final bill email.
 - **Housekeeping of records:** duplicate merging, plus data export and erasure for privacy requests.
 
+### Loyalty
+- **Points are held as lots.** Each earning carries its own expiry date and how much of it is left. A
+redemption eats the oldest lot first and expiry retires whatever is unused when a lot's date passes — so
+the desk can always say which stay a point came from and when it dies, which a single running total
+cannot.
+- **Earning** happens automatically when an invoice is issued, at the earn rate of the tier the guest
+held at the time, on the **taxable value** only: tax collected for the government is not spend with the
+hotel. A company-billed invoice earns the company nothing for the guest, and reprinting an invoice never
+earns twice.
+- **Redeeming** posts a payment to the folio, so points settle a bill exactly as cash does. A redemption
+can never exceed the balance, the property's minimum, or what is actually owed.
+- **Tiers** (Silver, Gold, Platinum by default, all editable) need both the nights *and* the spend of a
+rolling twelve months. Night audit re-checks every member and records each move with its reason.
+- Erasing a guest's data removes the membership and its points history; the folio lines a redemption
+produced are financial record and stay.
+
 ### Administration
-- **Roles:** twelve built-in, all editable, and you can add your own. Permissions are set per module and action.
+- **Roles:** twelve built-in, all editable, and you can add your own. Permissions are set per module and
+action — including the city ledger, and loyalty enrolment, corrections and redemption.
 - **Audit log:** every change, with before/after values. Entries cannot be edited or deleted.
 - **Message templates:** editable per language with placeholders like `{GuestName}`, under **Settings → Edit message templates**.
 - **Activity & sessions:** see who is signed in and end someone's sessions, under **Staff → Activity & sessions**.
@@ -260,6 +285,12 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
 - [ ] Switch 2FA to real mode: `TWO_FACTOR_MODE=totp`
 - [ ] Swap Razorpay test keys for live keys, and re-point the webhook at the live site
 - [ ] Confirm the invoice prefix and GSTIN with the hotel's accountant before the first invoice is issued
+- [ ] Set real exchange rates under **Billing → Currencies** before turning multi-currency on; the seeded
+      rates are indicative only
+- [ ] Agree the loyalty earn and redemption rates, tier thresholds and points expiry with the owner, then
+      turn the programme on under **Guests → Loyalty** (it ships switched off)
+- [ ] Set each corporate client's credit limit and payment terms under **Companies**, or the city ledger
+      will let an account run up without limit
 - [ ] Add the email and SMS keys, then send a test message
 - [ ] Connect door locks, if used, and test with the vendor
 - [ ] Confirm the Supabase data region is acceptable to the hotel, and name it in the privacy policy
@@ -277,12 +308,11 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
 
 ## Known gaps
 
-1. **Billing:** city ledger / corporate accounts receivable and multi-currency are the remaining parts of Module 7. Guests cannot yet pay on the public site — the desk sends them a payment link.
-2. **Loyalty points and tiers** (Module 8) are the next piece of work now that the billing ledger exists.
-3. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
-4. **Single property only** (Module 14).
-5. **The staff panel is English only.** Languages apply to guest messages.
-6. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
-7. **One lint warning:** `<img>` in the homepage hero.
+1. **Billing:** guests cannot yet pay on the public site — the desk sends them a payment link (Module 17).
+2. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
+3. **Single property only** (Module 14).
+4. **The staff panel is English only.** Languages apply to guest messages.
+5. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
+6. **One lint warning:** `<img>` in the homepage hero.
 
 **Room rates** are managed under **Admin → Rates**. The published tariff is also kept in `app/lib/rates-fallback.ts` as a fallback for the website; keep the two in step.
