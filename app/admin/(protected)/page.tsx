@@ -7,8 +7,10 @@ import { getSettings } from "../../lib/settings";
 import type { Booking, Room } from "../../lib/types";
 import { OCCUPYING_STATUSES, roomBoardLabel } from "../../lib/types";
 import { todayIn, minutesSince } from "../../lib/dates";
+import { kpisFrom, reportByKind, resolveRange, type DailyRow } from "../../lib/reports";
+import { runReport } from "../../lib/report-data";
 import LiveRefresh from "../components/LiveRefresh";
-import { PageHeader, Card, StatCard, StatusPill, fmtDate } from "../components/ui";
+import { PageHeader, Card, StatCard, StatusPill, fmtDate, fmtMoney } from "../components/ui";
 
 const BOARD_TONE: Record<string, string> = {
   "Vacant Clean": "bg-emerald-500",
@@ -29,6 +31,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const settings = await getSettings();
   const today = todayIn(settings.timezone);
   const seesBookings = can(session, "bookings.view") || can(session, "frontdesk.view");
+  const seesRevenue = can(session, "reports.financial");
+
+  // Today's trading, for the KPI row (SOW Module 13: "Real-time dashboard:
+  // occupancy %, ADR, RevPAR"). Only for roles allowed financial reports.
+  const todayKpis = seesRevenue
+    ? kpisFrom(
+        ((await runReport(supabase, reportByKind("daily_revenue")!, resolveRange("today", today))).rows ??
+          []) as unknown as DailyRow[],
+        Number(settings.monthly_operating_cost),
+      )
+    : null;
 
   const [tentative, waitlisted, arrivals, departures, inHouse, occupied, rooms, unassigned, openRequests, hkOpen, mtOpen, leavePending] =
     await Promise.all([
@@ -181,6 +194,35 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               href="/admin/rooms"
             />
           </div>
+
+          {todayKpis && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                label="ADR today"
+                value={fmtMoney(todayKpis.adr)}
+                hint="Room revenue ÷ rooms sold"
+                href="/admin/reports"
+              />
+              <StatCard
+                label="RevPAR today"
+                value={fmtMoney(todayKpis.revpar)}
+                hint="Room revenue ÷ rooms available"
+                href="/admin/reports"
+              />
+              <StatCard
+                label="Revenue today"
+                value={fmtMoney(todayKpis.totalRevenue)}
+                hint="Including tax"
+                href="/admin/reports/financial"
+              />
+              <StatCard
+                label="GOPPAR today"
+                value={todayKpis.goppar === null ? "—" : fmtMoney(todayKpis.goppar)}
+                hint={todayKpis.goppar === null ? "Set a monthly operating cost" : "After operating cost"}
+                href="/admin/reports"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <MovementList title="Arrivals" icon={<LogIn className="w-4 h-4 text-emerald-600" />} bookings={arrivalList} empty="No arrivals today." />

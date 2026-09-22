@@ -758,3 +758,79 @@ select price as price_unchanged_expect_500 from pos_items where id = '00000000-0
 select count(*) as hk_sees_orders_expect_0 from pos_orders;
 select count(*) as hk_sees_payments_expect_0 from pos_payments;
 reset role;
+
+\echo '=== Module 13: reporting and access control ==='
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+\echo '--- an administrator can run every report'
+select count(*) > 0 as daily_rows_expect_t   from report_daily(current_date - 2, current_date);
+select count(*) > 0 as tax_rows_expect_t     from report_tax_summary(current_date - 400, current_date + 400);
+select count(*) > 0 as outlet_rows_expect_t  from report_outlet_sales(current_date - 400, current_date + 400);
+select count(*) > 0 as owed_rows_expect_t    from report_outstanding();
+select count(*) >= 0 as hk_rows_ok           from report_housekeeping(current_date - 400, current_date + 400);
+
+\echo '--- the daily report says whether a figure is closed or still live'
+select distinct source from report_daily(current_date - 2, current_date);
+
+\echo '--- a closed night audit fixes the figure, so the report stops moving'
+insert into night_audits (business_date, status, completed_at, report)
+values (
+  current_date - 1, 'completed', now(),
+  '{"rooms": {"available": 99, "sold": 7}, "revenue": {"room": 70000, "fees": 0, "extras": 0, "penalties": 0, "tax": 3500, "total": 73500}}'::jsonb
+)
+on conflict (business_date) do update set status = 'completed', report = excluded.report;
+select source, rooms_available, rooms_sold, round(room_revenue) as room_rev, round(total_revenue) as total
+  from report_daily(current_date - 1, current_date - 1);
+\echo '    (the snapshot is used verbatim, not recomputed from the folio)'
+
+\echo '--- the same range twice gives the same answer'
+select (select round(sum(total_revenue)) from report_daily(current_date - 1, current_date - 1))
+     = (select round(sum(total_revenue)) from report_daily(current_date - 1, current_date - 1)) as reproducible_expect_t;
+
+\echo '--- EXPECT refusal: a housekeeper reading the tax summary'
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+select report_tax_summary(current_date - 30, current_date);
+
+\echo '--- EXPECT refusal: a housekeeper reading outlet sales'
+select report_outlet_sales(current_date - 30, current_date);
+
+\echo '--- EXPECT refusal: a housekeeper reading what guests owe'
+select report_outstanding();
+
+\echo '--- EXPECT refusal: a housekeeper reading housekeeping performance (no reports.view)'
+select report_housekeeping(current_date - 30, current_date);
+
+\echo '--- a front desk agent has no reporting permission either: EXPECT refusal'
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', false);
+select report_daily(current_date - 1, current_date);
+reset role;
+
+\echo '--- finance may read financial reports but a housekeeper never can'
+select 'reports.financial on finance: ' ||
+  (select count(*) from role_permissions where role_key='finance' and permission='reports.financial')::text;
+select 'reports.financial on housekeeping: ' ||
+  (select count(*) from role_permissions where role_key='housekeeping' and permission='reports.financial')::text;
+
+\echo '--- the scheduler (service key, no signed-in user) may still run reports'
+set role service_role;
+select count(*) > 0 as service_can_report_expect_t from report_daily(current_date - 2, current_date);
+reset role;
+
+\echo '--- EXPECT refusal: an anonymous caller, who also has no auth.uid()'
+set role anon;
+select report_tax_summary(current_date - 30, current_date);
+reset role;
+
+\echo '--- schedules: only a scheduler-permission holder may write them'
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+insert into report_schedules (name, report, frequency, recipients)
+values ('Owner daily', 'kpi_summary', 'daily', 'owner@example.com');
+select name, report, frequency, is_active from report_schedules;
+\echo '    EXPECT refusal: a housekeeper adding one'
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+insert into report_schedules (name, report, frequency, recipients)
+values ('Sneaky', 'daily_revenue', 'daily', 'hk@example.com');
+select count(*) as hk_sees_schedules_expect_0 from report_schedules;
+reset role;

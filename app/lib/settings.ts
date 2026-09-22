@@ -61,6 +61,7 @@ export const DEFAULT_SETTINGS: PropertySettings = {
   loyalty_expiry_months: 24,
   loyalty_min_redeem_points: 500,
   pos_room_charge_limit: 0,
+  monthly_operating_cost: 0,
   updated_at: new Date(0).toISOString(),
 };
 

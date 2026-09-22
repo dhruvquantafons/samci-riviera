@@ -170,6 +170,19 @@ export default async function SettingsPage() {
               />
             </div>
           </div>
+          <Field
+            label="Monthly operating cost (₹)"
+            hint="Used only to report GOPPAR, prorated over the days reported. 0 = GOPPAR is not reported."
+          >
+            <input
+              type="number"
+              name="monthly_operating_cost"
+              min={0}
+              step="0.01"
+              defaultValue={s.monthly_operating_cost}
+              className={inputClass}
+            />
+          </Field>
           <Field label="Invoice terms" hint="Printed at the foot of every invoice.">
             <textarea name="invoice_terms" rows={2} defaultValue={s.invoice_terms} className={inputClass} />
           </Field>

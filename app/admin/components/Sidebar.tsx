@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Settings,
   ScrollText,
+  ChartColumn,
   KeyRound,
   LogOut,
   Menu,
@@ -90,6 +91,12 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
         any: ["folio.invoice", "folio.refund_approve", "folio.city_ledger"],
       },
       { href: "/admin/companies", label: "Companies", icon: Building2, any: ["companies.manage"] },
+      {
+        href: "/admin/reports",
+        label: "Reports",
+        icon: ChartColumn,
+        any: ["reports.view", "reports.financial", "reports.schedule"],
+      },
     ],
   },
   {

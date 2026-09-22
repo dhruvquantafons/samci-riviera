@@ -39,8 +39,8 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 8 | Guest CRM & loyalty | ✅ Done |
 | 11 | Maintenance / engineering | ✅ Done |
 | 12 | HR & staff | ✅ Done |
+| 13 | Reporting & analytics | ✅ Done |
 | 15 | Roles, permissions & administration | ✅ Done |
-| 13 | Reports | 🟡 Dashboard and night-audit report only |
 | 16 | Notifications | 🟡 Booking messages and editable templates only |
 | 17 | Guest booking portal | 🟡 Search, live price and booking request; no online payment or guest accounts |
 | 4 | Revenue & dynamic pricing | ⬜ Not started |
@@ -98,6 +98,7 @@ Open <http://localhost:3000>. The public site works without any keys. The admin 
 | `0015_city_ledger_and_currency.sql` | City ledger (corporate A/R), exchange rates, foreign-currency settlement |
 | `0016_loyalty.sql` | Loyalty tiers, points lots, redemption, expiry, tier history |
 | `0017_pos.sql` | Outlets, menus, modifiers, bills, split/merge, charge to room, KOT |
+| `0018_reports.sql` | Permission-checked report functions, KPI sources, scheduled reports |
 
 Migrations upgrade an existing database in place; existing data is kept.
 
@@ -118,7 +119,7 @@ Set these in `.env.local` locally, and in **Vercel → Settings → Environment 
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Optional | SMS |
 | `DOOR_LOCK_WEBHOOK_URL`, `DOOR_LOCK_API_KEY` | Optional | Electronic key cards |
 | `ROOM_CONTROLS_SECRET` | Optional | Do Not Disturb from in-room controls |
-| `CRON_SECRET` | Optional | Scheduled maintenance job (escalations, preventive tickets) |
+| `CRON_SECRET` | Optional | Scheduled jobs: maintenance escalations, and emailed reports |
 | `ATTENDANCE_API_SECRET` | Optional | Biometric attendance devices |
 | `KOT_WEBHOOK_URL`, `KOT_API_KEY` | Optional | Kitchen display for outlet order tickets |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Optional | Online payment links |
@@ -137,13 +138,14 @@ npm start        # serve the production build
 npm run lint     # ESLint
 npm test         # unit tests (pricing, tax, penalties, room assignment, passwords, HR, templates,
                  #             invoices, city-ledger aging, currency conversion, loyalty points,
-                 #             POS lines, tax bands and charge-to-room rules)
+                 #             POS lines, tax bands and charge-to-room rules,
+                 #             hotel KPIs, GOPPAR and report date ranges)
 ```
 
 Database tests apply every migration to a throwaway local Postgres and check behaviour: overbooking,
 permissions, housekeeping, maintenance, HR, guest records, invoice immutability, refund approval, city
 ledger transfers and credit limits, loyalty earning, redemption and expiry, and the POS bill lifecycle
-(split and merge, charge to room, the outlet limit and points at the till).
+(split and merge, charge to room, the outlet limit and points at the till), and who may read which report.
 
 ```bash
 PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres supabase/tests/run.sh
@@ -165,14 +167,14 @@ app/
 ├── api/                   Integration endpoints (see below)
 ├── lib/                   Shared logic: auth, permissions, pricing, tax, dates, HR,
 │                          notifications, templates, integrations, invoices,
-│                          city-ledger, currency, loyalty, pos
+│                          city-ledger, currency, loyalty, pos, reports
 └── admin/
     ├── *-actions.ts       Server actions, one file per area
     ├── login/, security/  Sign-in, 2FA, password
     └── (protected)/       Admin pages:
         dashboard, front-desk, bookings, guests (+ loyalty), groups, tape-chart,
         rooms, housekeeping, maintenance, pos (till, bills, menus), hr, rates,
-        companies, night-audit,
+        companies, reports, night-audit,
         billing (invoices, refunds, city-ledger, currencies), staff, roles,
         settings, audit
 ```
@@ -257,10 +259,35 @@ rolling twelve months. Night audit re-checks every member and records each move 
 - Erasing a guest's data removes the membership and its points history; the folio lines a redemption
 produced are financial record and stay.
 
+### Reports
+- **Core KPIs** for any period: occupancy, ADR, RevPAR, GOPPAR, total revenue, outstanding balance, cancellation
+rate and no-show rate. ADR divides by rooms *sold* and RevPAR by rooms *available* — that difference is why a
+hotel quotes both.
+- **Figures from a closed night audit never change.** Each day's row says whether it came from the stored audit
+snapshot or was computed live, so a stay amended in March cannot silently rewrite January's revenue. That is what
+makes the same report for the same dates give the same answer every time.
+- **Financial reports** — daily revenue, tax summary by rate, payments and refunds, outlet-wise sales, outlet
+settlement, and money owed — are restricted to management and finance. The restriction is enforced by the database
+functions themselves, not just hidden in the interface, so it holds for the screen, the CSV export and the
+scheduler alike.
+- **Operational reports:** housekeeping performance per attendant, maintenance turnaround against SLA by priority,
+and staff attendance against the roster.
+- **Guest reports:** repeat guest ratio, feedback scores by category, and loyalty performance including how much
+of the outstanding points liability guests are actually redeeming.
+- **Build a report** from any of the above over a chosen period, then export to CSV (which Excel opens) or print
+to PDF. It is a chooser over reports the system knows how to produce rather than an open query tool: every report
+carries its own access rule, and the front desk should not be able to write SQL against the folio.
+- **Scheduled email reports** go out daily, weekly on Monday, or monthly on the 1st — always covering a period
+that has finished. A schedule already sent today is skipped, so a retrying scheduler cannot email the owner twice.
+- **GOPPAR** needs the hotel's running cost, which this system does not hold: it has no expense ledger, and the
+SOW leaves accounting to the hotel's own software. Enter a monthly figure under Settings and it is prorated across
+the days reported; leave it at zero and GOPPAR is simply not reported rather than reported wrongly.
+
 ### Administration
 - **Roles:** twelve built-in, all editable, and you can add your own. Permissions are set per module and
 action — including the city ledger, loyalty enrolment, corrections and redemption, and the outlets (taking orders,
-settling bills and managing menus are separate permissions).
+settling bills and managing menus are separate permissions), and reports (operational, financial and scheduling
+are separate).
 - **Audit log:** every change, with before/after values. Entries cannot be edited or deleted.
 - **Message templates:** editable per language with placeholders like `{GuestName}`, under **Settings → Edit message templates**.
 - **Activity & sessions:** see who is signed in and end someone's sessions, under **Staff → Activity & sessions**.
@@ -289,6 +316,7 @@ Other protections:
 | `POST /api/room-controls` | In-room controls (Do Not Disturb) | `Bearer ROOM_CONTROLS_SECRET` |
 | `POST /api/attendance` | Biometric attendance devices | `Bearer ATTENDANCE_API_SECRET` |
 | `GET /api/cron/maintenance` | Scheduler, every 15–30 min (e.g. Vercel Cron) | `Bearer CRON_SECRET` |
+| `GET /api/cron/reports` | Scheduler, once each morning | `Bearer CRON_SECRET` |
 | `POST /api/payments/razorpay/webhook` | Razorpay | `X-Razorpay-Signature` (HMAC, `RAZORPAY_WEBHOOK_SECRET`) |
 
 Each endpoint is disabled until its secret is set. Request formats are documented at the top of each route file.
@@ -302,6 +330,16 @@ The site is deployed on **Vercel** from `master`. Every pull request gets its ow
 1. Run any new migrations in Supabase **before** merging.
 2. Check the pull request's Vercel preview.
 3. Merge to `master`; production deploys automatically.
+
+**Scheduled jobs** are declared in `vercel.json`: the report emails at 02:00 UTC (07:30 IST) and the maintenance
+sweep half an hour later. Both need `CRON_SECRET`; Vercel sends it as a bearer token automatically. The schedules
+are daily so they work on any Vercel plan — on Pro you can tighten the maintenance sweep to `*/30 * * * *`, which
+is what its SLA escalation is really designed for. Night audit and the maintenance board do the same work, so a
+daily sweep is a backstop rather than the only path.
+
+**`NEXT_PUBLIC_SUPABASE_URL` is read at build time** by `next.config.ts`, to put the Storage host on
+`next/image`'s allow-list. If you add or change it after a deployment, redeploy — room photos will 404 until you
+do.
 
 Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `robots.txt` and email links all use it.
 
@@ -322,6 +360,8 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
       menus**; all seven ship set up, with only the restaurant, mini-bar, room service and laundry open
 - [ ] Confirm every outlet's tax rate and service charge with the accountant, and load the real menus and prices
 - [ ] Decide the outlet charge limit per stay under **Settings** (it ships at no limit)
+- [ ] Enter the monthly operating cost under **Settings** if the owner wants GOPPAR reported
+- [ ] Point a daily scheduler at `/api/cron/reports` and set up who receives which report
 - [ ] Add the email and SMS keys, then send a test message
 - [ ] Connect door locks, if used, and test with the vendor
 - [ ] Confirm the Supabase data region is acceptable to the hotel, and name it in the privacy policy
@@ -340,12 +380,13 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
 ## Known gaps
 
 1. **Billing:** guests cannot yet pay on the public site — the desk sends them a payment link (Module 17).
-2. **POS stock:** recipe and ingredient deduction is out of scope (optional in the SOW), so the outlets sell
+2. **Reports:** there is no expense ledger, so GOPPAR relies on a monthly operating cost entered by hand.
+3. **POS stock:** recipe and ingredient deduction is out of scope (optional in the SOW), so the outlets sell
    without tracking stock.
-3. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
-4. **Single property only** (Module 14).
-5. **The staff panel is English only.** Languages apply to guest messages.
-6. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
-7. **One lint warning:** `<img>` in the homepage hero.
+4. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
+5. **Single property only** (Module 14).
+6. **The staff panel is English only.** Languages apply to guest messages.
+7. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
+8. **One lint warning:** `<img>` in the homepage hero.
 
 **Room rates** are managed under **Admin → Rates**. The published tariff is also kept in `app/lib/rates-fallback.ts` as a fallback for the website; keep the two in step.
