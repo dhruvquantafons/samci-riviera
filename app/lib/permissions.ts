@@ -109,6 +109,14 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    module: "Reports",
+    permissions: [
+      { key: "reports.view", label: "Operational and guest reports" },
+      { key: "reports.financial", label: "Financial reports: revenue, tax, outlet sales, money owed" },
+      { key: "reports.schedule", label: "Set up scheduled email reports" },
+    ],
+  },
+  {
     module: "Administration",
     permissions: [
       { key: "staff.manage", label: "Manage staff accounts" },

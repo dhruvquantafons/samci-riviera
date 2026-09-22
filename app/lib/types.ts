@@ -614,6 +614,7 @@ export interface PropertySettings {
   loyalty_expiry_months: number;
   loyalty_min_redeem_points: number;
   pos_room_charge_limit: number;
+  monthly_operating_cost: number;
   updated_at: string;
 }
 
@@ -1325,5 +1326,28 @@ export interface PosPayment {
   reference: string;
   voided_at: string | null;
   void_reason: string;
+  created_at: string;
+}
+
+
+// ── Module 13: Reporting ────────────────────────────────────────────────────
+
+export type ReportFrequency = "daily" | "weekly" | "monthly";
+
+export const REPORT_FREQUENCY_LABELS: Record<ReportFrequency, string> = {
+  daily: "Every day",
+  weekly: "Every Monday",
+  monthly: "First of the month",
+};
+
+export interface ReportSchedule {
+  id: string;
+  name: string;
+  report: string;
+  frequency: ReportFrequency;
+  recipients: string;
+  is_active: boolean;
+  last_sent_at: string | null;
+  last_status: string;
   created_at: string;
 }
