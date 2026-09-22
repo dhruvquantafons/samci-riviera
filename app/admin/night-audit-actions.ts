@@ -26,7 +26,8 @@ import { type ActionState, bool } from "./form-utils";
  *      due deep cleans and preventive maintenance, and escalates overdue
  *      maintenance tickets.
  *   6. Purges identity scans past the retention period, retires expired
- *      loyalty points and re-checks every member's tier.
+ *      loyalty points, re-checks every member's tier and totals the outlet
+ *      takings.
  *   7. Stores the daily revenue report and rolls the business date forward.
  *
  * Each step is idempotent, so a run that fails part-way can be run again.
@@ -228,6 +229,36 @@ export async function runNightAudit(_prev: ActionState, fd: FormData): Promise<A
     tiersReviewed = Number(reviewed ?? 0);
   }
 
+  // ── 6c. Outlet takings ──
+  //
+  // A bill charged to a room already shows up in the folio figures below, but
+  // one settled with cash at the restaurant never touches a folio. Without
+  // this the daily revenue report would quietly understate the day's trade.
+  const { data: posRows } = await supabase
+    .from("pos_orders")
+    .select("id, grand_total, pos_outlets(name), pos_payments(kind, amount, voided_at)")
+    .eq("status", "settled")
+    .gte("closed_at", zonedTime(day, "00:00", settings.timezone).toISOString())
+    .lt("closed_at", zonedTime(nextDay, "00:00", settings.timezone).toISOString());
+
+  const outletTakings: Record<string, number> = {};
+  const outletByMethod: Record<string, number> = {};
+  let posTotal = 0;
+  for (const row of posRows ?? []) {
+    const order = row as unknown as {
+      grand_total: number;
+      pos_outlets: { name: string } | null;
+      pos_payments: { kind: string; amount: number; voided_at: string | null }[];
+    };
+    const name = order.pos_outlets?.name ?? "Outlet";
+    outletTakings[name] = Math.round(((outletTakings[name] ?? 0) + Number(order.grand_total)) * 100) / 100;
+    posTotal += Number(order.grand_total);
+    for (const p of order.pos_payments ?? []) {
+      if (p.voided_at) continue;
+      outletByMethod[p.kind] = Math.round(((outletByMethod[p.kind] ?? 0) + Number(p.amount)) * 100) / 100;
+    }
+  }
+
   // ── 7. Daily revenue report ──
   const [{ count: sellable }, { count: arrivals }, { count: departures }, { count: cancellations }] = await Promise.all([
     supabase.from("rooms").select("id", { count: "exact", head: true }).neq("status", "out_of_service"),
@@ -289,6 +320,12 @@ export async function runNightAudit(_prev: ActionState, fd: FormData): Promise<A
     maintenance: { preventive_created: (mtCreated as number | null) ?? 0, escalated: mtEscalated },
     compliance: { id_documents_purged: purged },
     loyalty: { points_expired: pointsExpired, tiers_reviewed: tiersReviewed },
+    outlets: {
+      bills: (posRows ?? []).length,
+      total: Math.round(posTotal * 100) / 100,
+      by_outlet: outletTakings,
+      by_method: outletByMethod,
+    },
     posted_room_charges: charges.posted,
   };
 

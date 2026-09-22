@@ -613,6 +613,7 @@ export interface PropertySettings {
   loyalty_program_name: string;
   loyalty_expiry_months: number;
   loyalty_min_redeem_points: number;
+  pos_room_charge_limit: number;
   updated_at: string;
 }
 
@@ -1170,4 +1171,159 @@ export interface LoyaltyTierChange {
   nights: number;
   spend: number;
   changed_at: string;
+}
+
+
+// ── Module 6: Point of Sale ─────────────────────────────────────────────────
+
+/** The seven outlet types the SOW names. */
+export type OutletKind =
+  | "restaurant"
+  | "bar"
+  | "spa"
+  | "gift_shop"
+  | "mini_bar"
+  | "room_service"
+  | "laundry";
+
+export const OUTLET_KIND_LABELS: Record<OutletKind, string> = {
+  restaurant: "Restaurant",
+  bar: "Bar",
+  spa: "Spa / Wellness",
+  gift_shop: "Gift Shop",
+  mini_bar: "Mini-Bar",
+  room_service: "Room Service",
+  laundry: "Laundry",
+};
+
+export interface Outlet {
+  id: string;
+  code: string;
+  name: string;
+  kind: OutletKind;
+  tax_rate: number;
+  tax_inclusive: boolean;
+  service_charge_percent: number;
+  orders_by: "table" | "room" | "either";
+  sends_kot: boolean;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface PosCategory {
+  id: string;
+  outlet_id: string;
+  name: string;
+  /** Null inherits the outlet's rate. */
+  tax_rate: number | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface PosItem {
+  id: string;
+  outlet_id: string;
+  category_id: string | null;
+  code: string;
+  name: string;
+  description: string;
+  price: number;
+  /** Null inherits the category's rate, then the outlet's. */
+  tax_rate: number | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface PosModifier {
+  id: string;
+  outlet_id: string;
+  name: string;
+  price_delta: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type PosOrderStatus = "open" | "billed" | "settled" | "void";
+
+export const POS_ORDER_STATUS_LABELS: Record<PosOrderStatus, string> = {
+  open: "Open",
+  billed: "Part paid",
+  settled: "Settled",
+  void: "Void",
+};
+
+/** A modifier as frozen onto a line at the moment it was ordered. */
+export interface PosLineModifier {
+  name: string;
+  price_delta: number;
+}
+
+export interface PosOrder {
+  id: string;
+  number: string;
+  outlet_id: string;
+  table_no: string;
+  room_id: string | null;
+  booking_id: string | null;
+  guest_name: string;
+  covers: number;
+  status: PosOrderStatus;
+  net_total: number;
+  tax_total: number;
+  service_net: number;
+  service_tax: number;
+  tip_amount: number;
+  grand_total: number;
+  notes: string;
+  split_from_id: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  voided_at: string | null;
+  void_reason: string;
+  pos_outlets?: Pick<Outlet, "name" | "code" | "kind" | "sends_kot"> | null;
+  rooms?: { room_number: string } | null;
+  bookings?: Pick<Booking, "reference" | "contact_name" | "status"> | null;
+}
+
+export interface PosOrderLine {
+  id: string;
+  order_id: string;
+  item_id: string | null;
+  name: string;
+  qty: number;
+  unit_price: number;
+  modifiers: PosLineModifier[];
+  notes: string;
+  net_amount: number;
+  tax_rate: number;
+  tax_amount: number;
+  kot_sent_at: string | null;
+  voided_at: string | null;
+  void_reason: string;
+  created_at: string;
+}
+
+export type PosPaymentKind = "cash" | "card" | "upi" | "room_charge" | "loyalty_points" | "other";
+
+export const POS_PAYMENT_KIND_LABELS: Record<PosPaymentKind, string> = {
+  cash: "Cash",
+  card: "Card",
+  upi: "UPI",
+  room_charge: "Charged to room",
+  loyalty_points: "Loyalty points",
+  other: "Other",
+};
+
+export interface PosPayment {
+  id: string;
+  order_id: string;
+  kind: PosPaymentKind;
+  amount: number;
+  booking_id: string | null;
+  folio_id: string | null;
+  points: number | null;
+  reference: string;
+  voided_at: string | null;
+  void_reason: string;
+  created_at: string;
 }

@@ -58,6 +58,15 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    module: "Point of sale",
+    permissions: [
+      { key: "pos.view", label: "View outlets, bills and takings" },
+      { key: "pos.order", label: "Open bills and take orders" },
+      { key: "pos.pay", label: "Settle bills and charge to a room" },
+      { key: "pos.manage", label: "Manage outlets, menus, prices and void bills" },
+    ],
+  },
+  {
     module: "Rooms",
     permissions: [
       { key: "rooms.view", label: "View the room board" },
