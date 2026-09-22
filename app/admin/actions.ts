@@ -334,6 +334,7 @@ export async function saveSettings(_prev: ActionState, fd: FormData): Promise<Ac
       online_payments_enabled: bool(fd, "online_payments_enabled"),
       multi_currency_enabled: bool(fd, "multi_currency_enabled"),
       ar_reminder_days: int(fd, "ar_reminder_days", 7, 0, 180),
+      pos_room_charge_limit: Math.max(0, num(fd, "pos_room_charge_limit") ?? 0),
     })
     .eq("id", true);
   if (error) return { error: friendlyDbError(error.message) };

@@ -599,3 +599,162 @@ select count(*) > 0 as hk_sees_tiers_expect_t from loyalty_tiers;
 update loyalty_tiers set earn_rate = 99 where key = 'silver';
 select earn_rate as earn_rate_expect_0_05 from loyalty_tiers where key = 'silver';
 reset role;
+
+\echo '=== Module 6: point of sale ==='
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+\echo '--- all seven outlet types the SOW names are set up'
+select count(*) as outlets_expect_7, count(distinct kind) as kinds_expect_7 from pos_outlets;
+
+\echo '--- a menu on the restaurant: outlet tax 5%, service charge 10%'
+insert into pos_categories (id, outlet_id, name)
+select '00000000-0000-0000-0000-0000000000e1', id, 'Wazwan' from pos_outlets where code = 'RST';
+insert into pos_items (id, outlet_id, category_id, name, price)
+select '00000000-0000-0000-0000-0000000000e2', id, '00000000-0000-0000-0000-0000000000e1', 'Rista', 1000
+  from pos_outlets where code = 'RST';
+insert into pos_items (id, outlet_id, category_id, name, price)
+select '00000000-0000-0000-0000-0000000000e3', id, '00000000-0000-0000-0000-0000000000e1', 'Kahwa', 500
+  from pos_outlets where code = 'RST';
+select pos_item_tax_rate('00000000-0000-0000-0000-0000000000e2') as inherits_outlet_expect_5;
+
+\echo '--- a category rate overrides the outlet, and an item rate overrides both'
+update pos_categories set tax_rate = 12 where id = '00000000-0000-0000-0000-0000000000e1';
+select pos_item_tax_rate('00000000-0000-0000-0000-0000000000e2') as from_category_expect_12;
+update pos_items set tax_rate = 18 where id = '00000000-0000-0000-0000-0000000000e2';
+select pos_item_tax_rate('00000000-0000-0000-0000-0000000000e2') as from_item_expect_18;
+update pos_items set tax_rate = null where id = '00000000-0000-0000-0000-0000000000e2';
+update pos_categories set tax_rate = null where id = '00000000-0000-0000-0000-0000000000e1';
+
+\echo '--- opening a bill numbers it per outlet, and totals add up as lines go on'
+select pos_open_order((select id from pos_outlets where code='RST'), '7', null, null, 'Imran', 2) as order_id
+\gset
+select number, status from pos_orders where id = :'order_id';
+select pos_add_line(:'order_id', '00000000-0000-0000-0000-0000000000e2', 1) is not null as line_1;
+select pos_add_line(:'order_id', '00000000-0000-0000-0000-0000000000e3', 2) is not null as line_2;
+\echo '    net 2000, tax 100 at 5%, service 200 + 10 tax, grand 2310'
+select net_total, tax_total, service_net, service_tax, grand_total from pos_orders where id = :'order_id';
+select round(pos_order_balance(:'order_id')) as owed_expect_2310;
+
+\echo '--- a modifier changes the line price and is frozen onto the line'
+insert into pos_modifiers (id, outlet_id, name, price_delta)
+select '00000000-0000-0000-0000-0000000000e4', id, 'Extra gravy', 50 from pos_outlets where code='RST';
+insert into pos_item_modifiers (item_id, modifier_id)
+values ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e4');
+select pos_add_line(:'order_id', '00000000-0000-0000-0000-0000000000e2', 1,
+  array['00000000-0000-0000-0000-0000000000e4']::uuid[], 'mild') is not null as line_3;
+select unit_price, modifiers, notes from pos_order_lines
+ where order_id = :'order_id' and notes = 'mild';
+
+\echo '--- EXPECT refusal: an item from another outlet''s menu'
+insert into pos_items (id, outlet_id, name, price)
+select '00000000-0000-0000-0000-0000000000e5', id, 'Whisky', 800 from pos_outlets where code='BAR';
+select pos_add_line(:'order_id', '00000000-0000-0000-0000-0000000000e5', 1);
+
+\echo '--- splitting moves a line onto a second bill; both recompute'
+select pos_open_order((select id from pos_outlets where code='RST'), '7b') as split_id
+\gset
+select pos_move_lines(array[(select id from pos_order_lines where order_id = :'order_id' and notes='mild')], :'split_id') as moved_expect_1;
+select (select round(grand_total) from pos_orders where id = :'order_id') as first_bill,
+       (select round(grand_total) from pos_orders where id = :'split_id') as second_bill;
+
+\echo '--- merging moves them back and the empty bill is voided'
+select pos_move_lines(array(select id from pos_order_lines where order_id = :'split_id'), :'order_id') as merged_expect_1;
+select pos_void_order(:'split_id', 'Merged into the other bill');
+select status, void_reason from pos_orders where id = :'split_id';
+select count(*) as lines_on_voided_bill_expect_0 from pos_order_lines where order_id = :'split_id';
+
+\echo '--- EXPECT refusal: voiding a bill with no reason'
+select pos_void_order(:'order_id', '  ');
+
+\echo '--- EXPECT refusal: charging to a room whose guest is not checked in'
+select pos_charge_to_room(:'order_id', (select id from bookings where reference='SR-1002'));
+
+\echo '--- charging to room posts one folio line per tax rate, plus service and tip'
+update bookings set status = 'checked_in' where reference = 'SR-1012';
+update pos_orders set tip_amount = 100 where id = :'order_id';
+select pos_recalc_order(:'order_id');
+select round(grand_total) as grand_with_tip from pos_orders where id = :'order_id';
+select pos_charge_to_room(:'order_id', (select id from bookings where reference='SR-1012')) is not null as charged;
+select description, round(amount) as net, round(tax_amount) as tax, tax_rate
+  from folio_entries
+ where reference = (select number from pos_orders where id = :'order_id')
+ order by description;
+select status, round(pos_order_balance(:'order_id')) as balance_expect_0
+  from pos_orders where id = :'order_id';
+
+\echo '--- EXPECT refusal: charging a bill that is already settled'
+select pos_charge_to_room(:'order_id', (select id from bookings where reference='SR-1012'));
+
+\echo '--- the property''s outlet limit per stay is enforced'
+update property_settings set pos_room_charge_limit = 100;
+select pos_open_order((select id from pos_outlets where code='RST'), '9') as limited_id
+\gset
+select pos_add_line(:'limited_id', '00000000-0000-0000-0000-0000000000e3', 1) is not null as added;
+\echo '    EXPECT refusal: the stay already carries more than the limit'
+select pos_charge_to_room(:'limited_id', (select id from bookings where reference='SR-1012'));
+update property_settings set pos_room_charge_limit = 0;
+
+\echo '--- cash at the till, and EXPECT refusal on an overpayment'
+select round(pos_order_balance(:'limited_id')) as owed;
+select pos_take_payment(:'limited_id', 'cash', 99999);
+select pos_take_payment(:'limited_id', 'cash', pos_order_balance(:'limited_id')) is not null as paid;
+select status, round(pos_order_balance(:'limited_id')) as balance_expect_0
+  from pos_orders where id = :'limited_id';
+
+\echo '--- EXPECT refusal: adding to a bill that is closed'
+select pos_add_line(:'limited_id', '00000000-0000-0000-0000-0000000000e3', 1);
+
+\echo '--- EXPECT refusal: voiding a bill that has taken payment'
+select pos_void_order(:'limited_id', 'changed their mind');
+
+\echo '--- loyalty points settle an outlet bill, worth the tier rate'
+select loyalty_enroll('00000000-0000-0000-0000-0000000000a2') like 'RR%' as re_enrolled;
+select loyalty_adjust('00000000-0000-0000-0000-0000000000a2', 2000, 'Points for the POS test') as balance_expect_2000;
+select pos_open_order((select id from pos_outlets where code='RST'), '11') as pts_id
+\gset
+select pos_add_line(:'pts_id', '00000000-0000-0000-0000-0000000000e3', 1) is not null as added;
+\echo '    1,000 points at silver (0.25) = 250 off'
+select round(pos_redeem_points(:'pts_id', '00000000-0000-0000-0000-0000000000a2', 1000)) as off_expect_250;
+select loyalty_balance('00000000-0000-0000-0000-0000000000a2') as points_left_expect_1000;
+select kind, round(amount) as amount, points from pos_payments where order_id = :'pts_id';
+\echo '    a second redemption still fits, because 327.50 was left owing'
+select round(pos_redeem_points(:'pts_id', '00000000-0000-0000-0000-0000000000a2', 1000)) as off_expect_250;
+\echo '    EXPECT refusal: points worth more than a small bill'
+insert into pos_items (id, outlet_id, name, price)
+select '00000000-0000-0000-0000-0000000000e6', id, 'Bottled water', 100 from pos_outlets where code='RST';
+select pos_open_order((select id from pos_outlets where code='RST'), '11b') as small_id
+\gset
+select pos_add_line(:'small_id', '00000000-0000-0000-0000-0000000000e6', 1) is not null as added;
+select round(pos_order_balance(:'small_id')) as owed_expect_116;
+select pos_redeem_points(:'small_id', '00000000-0000-0000-0000-0000000000a2', 1000);
+
+\echo '--- a bill mixing two tax rates reaches the folio as two lines'
+insert into pos_items (id, outlet_id, name, price, tax_rate)
+select '00000000-0000-0000-0000-0000000000e7', id, 'Kingfisher', 800, 18 from pos_outlets where code='RST';
+select pos_open_order((select id from pos_outlets where code='RST'), '13') as mixed_id
+\gset
+select pos_add_line(:'mixed_id', '00000000-0000-0000-0000-0000000000e3', 1) is not null as added_5pct;
+select pos_add_line(:'mixed_id', '00000000-0000-0000-0000-0000000000e7', 1) is not null as added_18pct;
+select pos_charge_to_room(:'mixed_id', (select id from bookings where reference='SR-1012')) is not null as charged;
+select round(amount) as net, round(tax_amount) as tax, tax_rate
+  from folio_entries
+ where reference = (select number from pos_orders where id = :'mixed_id')
+   and description not like '%service charge%'
+ order by tax_rate;
+
+\echo '--- the kitchen ticket fires each line once'
+select pos_open_order((select id from pos_outlets where code='RST'), '12') as kot_id
+\gset
+select pos_add_line(:'kot_id', '00000000-0000-0000-0000-0000000000e3', 1) is not null as added;
+select pos_send_kot(:'kot_id') as fired_expect_1;
+select pos_send_kot(:'kot_id') as refired_expect_0;
+
+\echo '--- housekeeping may read the menu but not change it, and sees no bills'
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', false);
+select count(*) > 0 as hk_sees_menu_expect_t from pos_items;
+update pos_items set price = 1 where id = '00000000-0000-0000-0000-0000000000e3';
+select price as price_unchanged_expect_500 from pos_items where id = '00000000-0000-0000-0000-0000000000e3';
+select count(*) as hk_sees_orders_expect_0 from pos_orders;
+select count(*) as hk_sees_payments_expect_0 from pos_payments;
+reset role;

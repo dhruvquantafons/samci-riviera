@@ -34,6 +34,7 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 2 | Front desk (check-in / check-out) | ✅ Done |
 | 3 | Rooms, rates & inventory | ✅ Done |
 | 5 | Housekeeping | ✅ Done |
+| 6 | Point of sale | ✅ Done |
 | 7 | Billing, invoicing, folio & payments | ✅ Done |
 | 8 | Guest CRM & loyalty | ✅ Done |
 | 11 | Maintenance / engineering | ✅ Done |
@@ -43,13 +44,15 @@ Built to the *Hotel PMS Scope of Work* (18 modules).
 | 16 | Notifications | 🟡 Booking messages and editable templates only |
 | 17 | Guest booking portal | 🟡 Search, live price and booking request; no online payment or guest accounts |
 | 4 | Revenue & dynamic pricing | ⬜ Not started |
-| 6 | Point of sale | ⬜ Not started |
 | 9 | Channel manager / OTAs | ⬜ Not started |
 | 10 | Banquets & events | ⬜ Not started |
 | 14 | Multi-property | ⬜ Not started |
 | 18 | Mobile apps | ⬜ Not started (key staff screens already work on phones) |
 
-Modules 4, 6, 9, 10, 14 and 18 are the remaining work.
+Modules 4, 9, 10, 14 and 18 are the remaining work.
+
+The optional stock module in Module 6 (recipe and ingredient deduction) is deliberately not built: the SOW marks
+it optional.
 
 ---
 
@@ -94,6 +97,7 @@ Open <http://localhost:3000>. The public site works without any keys. The admin 
 | `0014_billing.sql` | Split folios, GST invoice numbering, gateway payments, refund approval |
 | `0015_city_ledger_and_currency.sql` | City ledger (corporate A/R), exchange rates, foreign-currency settlement |
 | `0016_loyalty.sql` | Loyalty tiers, points lots, redemption, expiry, tier history |
+| `0017_pos.sql` | Outlets, menus, modifiers, bills, split/merge, charge to room, KOT |
 
 Migrations upgrade an existing database in place; existing data is kept.
 
@@ -116,6 +120,7 @@ Set these in `.env.local` locally, and in **Vercel → Settings → Environment 
 | `ROOM_CONTROLS_SECRET` | Optional | Do Not Disturb from in-room controls |
 | `CRON_SECRET` | Optional | Scheduled maintenance job (escalations, preventive tickets) |
 | `ATTENDANCE_API_SECRET` | Optional | Biometric attendance devices |
+| `KOT_WEBHOOK_URL`, `KOT_API_KEY` | Optional | Kitchen display for outlet order tickets |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Optional | Online payment links |
 | `RAZORPAY_WEBHOOK_SECRET` | With Razorpay | Signs the webhook. Without it no online payment reaches a folio |
 
@@ -131,12 +136,14 @@ npm run build    # production build
 npm start        # serve the production build
 npm run lint     # ESLint
 npm test         # unit tests (pricing, tax, penalties, room assignment, passwords, HR, templates,
-                 #             invoices, city-ledger aging, currency conversion, loyalty points)
+                 #             invoices, city-ledger aging, currency conversion, loyalty points,
+                 #             POS lines, tax bands and charge-to-room rules)
 ```
 
 Database tests apply every migration to a throwaway local Postgres and check behaviour: overbooking,
 permissions, housekeeping, maintenance, HR, guest records, invoice immutability, refund approval, city
-ledger transfers and credit limits, and loyalty earning, redemption and expiry.
+ledger transfers and credit limits, loyalty earning, redemption and expiry, and the POS bill lifecycle
+(split and merge, charge to room, the outlet limit and points at the till).
 
 ```bash
 PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres supabase/tests/run.sh
@@ -158,13 +165,14 @@ app/
 ├── api/                   Integration endpoints (see below)
 ├── lib/                   Shared logic: auth, permissions, pricing, tax, dates, HR,
 │                          notifications, templates, integrations, invoices,
-│                          city-ledger, currency, loyalty
+│                          city-ledger, currency, loyalty, pos
 └── admin/
     ├── *-actions.ts       Server actions, one file per area
     ├── login/, security/  Sign-in, 2FA, password
     └── (protected)/       Admin pages:
         dashboard, front-desk, bookings, guests (+ loyalty), groups, tape-chart,
-        rooms, housekeeping, maintenance, hr, rates, companies, night-audit,
+        rooms, housekeeping, maintenance, pos (till, bills, menus), hr, rates,
+        companies, night-audit,
         billing (invoices, refunds, city-ledger, currencies), staff, roles,
         settings, audit
 ```
@@ -194,6 +202,24 @@ re-checks every member's tier, and moves the business date forward.
 - Check-outs create cleaning tasks automatically. Tasks are assigned by floor zone and workload, skipping staff on leave or rostered off.
 - Status flow: **Dirty → Cleaning → Clean → Inspected**. Only inspected rooms can be checked into.
 - Also included: a linen/amenities/minibar checklist, turnaround targets, deep-clean schedule, Do Not Disturb, and lost & found.
+
+### Outlets (point of sale)
+- **Seven outlet types** are set up out of the box: restaurant, bar, spa, gift shop, mini-bar, room service and
+laundry. Each keeps its own menu, prices, tax rate and service charge.
+- **Tax** is set on the outlet and can be overridden per category or per item, so one restaurant charges 5% on
+food and 18% on a beer. The effective rate is shown on every menu row.
+- **An order is the bill.** Splitting moves lines onto a second bill; merging moves them back and voids the empty
+one — the same idea as moving a charge between folios.
+- **Charge to room** posts to the guest's folio, one line per tax rate so the tax invoice's rate-wise summary stays
+correct. It is refused unless the guest is checked in, and it respects both the property's outlet limit per stay
+and, on a company-billed folio, that company's credit limit.
+- **Paying at the outlet:** cash, card, UPI, or loyalty points at the guest's tier rate.
+- **Kitchen tickets** mark each line as fired once, print from the browser, and can also be posted to a kitchen
+display with `KOT_WEBHOOK_URL`. POS hardware is the hotel's to buy (SOW §2.2); this integrates with it.
+- **Prices and tax are frozen onto every line** when it is ordered, so re-pricing the menu never rewrites a bill
+that has already been served.
+- Night audit totals the outlet takings, because a bill settled with cash never touches a folio and would
+otherwise be missing from the day's revenue.
 
 ### Maintenance
 - Any staff member can raise a ticket for a room, an asset or a place, with photos.
@@ -233,7 +259,8 @@ produced are financial record and stay.
 
 ### Administration
 - **Roles:** twelve built-in, all editable, and you can add your own. Permissions are set per module and
-action — including the city ledger, and loyalty enrolment, corrections and redemption.
+action — including the city ledger, loyalty enrolment, corrections and redemption, and the outlets (taking orders,
+settling bills and managing menus are separate permissions).
 - **Audit log:** every change, with before/after values. Entries cannot be edited or deleted.
 - **Message templates:** editable per language with placeholders like `{GuestName}`, under **Settings → Edit message templates**.
 - **Activity & sessions:** see who is signed in and end someone's sessions, under **Staff → Activity & sessions**.
@@ -291,6 +318,10 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
       turn the programme on under **Guests → Loyalty** (it ships switched off)
 - [ ] Set each corporate client's credit limit and payment terms under **Companies**, or the city ledger
       will let an account run up without limit
+- [ ] Confirm which outlets the hotel actually runs and close the rest under **Point of sale → Outlets &
+      menus**; all seven ship set up, with only the restaurant, mini-bar, room service and laundry open
+- [ ] Confirm every outlet's tax rate and service charge with the accountant, and load the real menus and prices
+- [ ] Decide the outlet charge limit per stay under **Settings** (it ships at no limit)
 - [ ] Add the email and SMS keys, then send a test message
 - [ ] Connect door locks, if used, and test with the vendor
 - [ ] Confirm the Supabase data region is acceptable to the hotel, and name it in the privacy policy
@@ -309,10 +340,12 @@ Set the canonical site address in `app/lib/site.ts` (`SITE.url`). The sitemap, `
 ## Known gaps
 
 1. **Billing:** guests cannot yet pay on the public site — the desk sends them a payment link (Module 17).
-2. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
-3. **Single property only** (Module 14).
-4. **The staff panel is English only.** Languages apply to guest messages.
-5. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
-6. **One lint warning:** `<img>` in the homepage hero.
+2. **POS stock:** recipe and ingredient deduction is out of scope (optional in the SOW), so the outlets sell
+   without tracking stock.
+3. **OTA channels:** the room allocation for each channel is stored, but only the website enforces it until the channel manager exists (Module 9).
+4. **Single property only** (Module 14).
+5. **The staff panel is English only.** Languages apply to guest messages.
+6. **Room rates:** the Royal and Presidential Suites need rates from the owner before they can be added under **Rates**.
+7. **One lint warning:** `<img>` in the homepage hero.
 
 **Room rates** are managed under **Admin → Rates**. The published tariff is also kept in `app/lib/rates-fallback.ts` as a fallback for the website; keep the two in step.

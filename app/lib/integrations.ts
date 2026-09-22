@@ -149,3 +149,60 @@ export async function sendKeyCardCommand(req: KeyCardRequest): Promise<DeliveryR
     };
   }
 }
+
+
+// ── Kitchen Order Tickets (Module 6) ───────────────────────────────────────
+
+export interface KotTicket {
+  order: string;
+  outlet: string;
+  table: string;
+  room: string;
+  guest: string;
+  covers: number;
+  placedAt: string;
+  lines: { name: string; qty: number; modifiers: string[]; notes: string }[];
+}
+
+/**
+ * Sends a kitchen ticket to a kitchen display or network printer.
+ *
+ * The SOW puts POS hardware out of scope (§2.2, "software integration only"),
+ * so this is a hook in the same shape as the door locks above: with no
+ * endpoint configured it stands down cleanly and the ticket is printed from
+ * the browser instead. Nothing in the order flow depends on it succeeding.
+ */
+export async function sendKotTicket(ticket: KotTicket): Promise<DeliveryResult & { provider: string }> {
+  const url = process.env.KOT_WEBHOOK_URL;
+  if (!url) {
+    return {
+      status: "skipped",
+      provider: "none",
+      providerId: "",
+      error: "No kitchen display connected (KOT_WEBHOOK_URL). Print the ticket instead.",
+    };
+  }
+  try {
+    const res = await post(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(process.env.KOT_API_KEY ? { Authorization: `Bearer ${process.env.KOT_API_KEY}` } : {}),
+      },
+      body: JSON.stringify(ticket),
+    });
+    return {
+      status: res.ok ? "sent" : "failed",
+      provider: new URL(url).hostname,
+      providerId: "",
+      error: res.ok ? "" : `HTTP ${res.status}`,
+    };
+  } catch (e) {
+    return {
+      status: "failed",
+      provider: new URL(url).hostname,
+      providerId: "",
+      error: e instanceof Error ? e.message : "Kitchen display unreachable",
+    };
+  }
+}

@@ -26,6 +26,7 @@ interface Report {
   maintenance?: { preventive_created: number; escalated: number };
   compliance: { id_documents_purged: number };
   loyalty?: { points_expired: number; tiers_reviewed: number };
+  outlets?: { bills: number; total: number; by_outlet: Record<string, number>; by_method: Record<string, number> };
   posted_room_charges: number;
 }
 
@@ -157,6 +158,9 @@ export default async function NightAuditReportPage({ params }: { params: Promise
               {r.housekeeping.room_statuses_updated} room status(es) synced with blocks ·{" "}
               {r.housekeeping.tasks_created ?? 0} housekeeping task(s) created for the next day ·{" "}
               {r.maintenance && `${r.maintenance.preventive_created} preventive maintenance ticket(s) raised, ${r.maintenance.escalated} overdue ticket(s) escalated · `}
+              {r.outlets &&
+                r.outlets.bills > 0 &&
+                `${r.outlets.bills} outlet bill(s) settled for ${fmtMoney(r.outlets.total)} · `}
               {r.loyalty &&
                 `${r.loyalty.points_expired} loyalty point(s) expired, ${r.loyalty.tiers_reviewed} member tier(s) reviewed · `}
               {r.compliance.id_documents_purged} identity

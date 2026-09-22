@@ -141,6 +141,16 @@ export default async function SettingsPage() {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field label="Outlet charges per stay (₹)" hint="Most a stay may carry unpaid from the outlets. 0 = no limit.">
+              <input
+                type="number"
+                name="pos_room_charge_limit"
+                min={0}
+                step="0.01"
+                defaultValue={s.pos_room_charge_limit}
+                className={inputClass}
+              />
+            </Field>
             <Field label="Chase accounts overdue by (days)" hint="Used by the city ledger chase list.">
               <input
                 type="number"
