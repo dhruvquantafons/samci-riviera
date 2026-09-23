@@ -15,6 +15,7 @@ import type {
   LoyaltyTier,
   LoyaltyTierChange,
   LoyaltyTransaction,
+  Notification as GuestMessage,
   RoomType,
 } from "../../../../lib/types";
 import { ID_TYPE_LABELS, LANGUAGES, guestTags } from "../../../../lib/types";
@@ -36,6 +37,7 @@ import {
   fmtDateTime,
   fmtMoney,
 } from "../../../components/ui";
+import NotificationList from "../../../components/NotificationList";
 import ActionForm from "../../../components/ActionForm";
 import { GuestTags, phoneKey } from "../shared";
 import LoyaltyPanel from "./LoyaltyPanel";
@@ -90,6 +92,7 @@ export default async function GuestProfilePage({
     { data: loyaltyRows },
     { data: tierHistory },
     { data: activity },
+    { data: messages },
   ] = await Promise.all([
     supabase.from("guest_stats").select("*").eq("guest_id", id).maybeSingle(),
     supabase
@@ -114,6 +117,15 @@ export default async function GuestProfilePage({
       .order("changed_at", { ascending: false })
       .limit(20),
     supabase.rpc("loyalty_rolling_activity", { p_guest: id, p_date: today }),
+    // SOW Module 16: "notification history log per guest". Read by guest
+    // rather than by booking, so it follows them across stays.
+    supabase
+      .from("notifications")
+      .select("*, bookings(id, reference)")
+      .eq("guest_id", id)
+      .eq("kind", "guest")
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
   const stats = statRow as GuestStats | null;
   const stays = (stayRows ?? []) as unknown as Stay[];
@@ -366,6 +378,14 @@ export default async function GuestProfilePage({
         ) : (
           profile
         )}
+      </Card>
+
+      <Card className="p-5 space-y-4">
+        <SectionTitle>Messages sent</SectionTitle>
+        <NotificationList
+          items={(messages ?? []) as unknown as GuestMessage[]}
+          empty="No messages have been sent to this guest yet."
+        />
       </Card>
 
       <Card className="p-5 space-y-4">

@@ -17,6 +17,8 @@ export default function ActionForm({
   pendingLabel = "Saving…",
   className = "space-y-4",
   submitClassName = buttonClass,
+  submitName,
+  submitValue,
   confirmMessage,
   overbookHint,
   footer,
@@ -27,6 +29,13 @@ export default function ActionForm({
   pendingLabel?: string;
   className?: string;
   submitClassName?: string;
+  /**
+   * Name and value carried by the submit button, for a form with more than one
+   * outcome. The submitter is included in the FormData, so the action can tell
+   * which button was pressed — a hidden field could not.
+   */
+  submitName?: string;
+  submitValue?: string;
   /** Ask before submitting, for irreversible actions. */
   confirmMessage?: string;
   /** Shown when the database refuses for lack of rooms. */
@@ -41,7 +50,7 @@ export default function ActionForm({
       <Banner error={state.error} success={state.success} />
       {state.overbooked && overbookHint}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={pending} className={submitClassName}>
+        <button type="submit" name={submitName} value={submitValue} disabled={pending} className={submitClassName}>
           {pending ? pendingLabel : submitLabel}
         </button>
         {footer}

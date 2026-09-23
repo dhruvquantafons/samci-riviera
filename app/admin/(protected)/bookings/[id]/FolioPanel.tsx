@@ -183,6 +183,11 @@ export default function FolioPanel({
                 <input name="reference" className={inputClass} />
               </Field>
             </div>
+            <Check
+              name="send_receipt"
+              label="Email a receipt"
+              hint="For a payment taken remotely. Refunds never send one."
+            />
             <Check name="is_deposit" label="This is a deposit" />
           </ActionForm>
         )}

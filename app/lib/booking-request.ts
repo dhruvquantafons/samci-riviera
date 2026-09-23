@@ -2,17 +2,36 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "./supabase/server";
+import { createPaymentLink, cancelPaymentLink, razorpayConfigured } from "./razorpay";
+import { normalisePhone } from "./integrations";
 import { hasSupabaseConfig } from "./supabase/config";
-import { loadPricingData, type PricingData } from "./rate-data";
+import { loadPricingData, resolvePromo, type PricingData } from "./rate-data";
+import { discountNights, nightsTotal } from "./revenue";
 import { quoteStay } from "./pricing";
 import { splitRoomTax } from "./tax";
 import { isOverbooked } from "./db-errors";
 import { eachNight, isIsoDate, todayIn } from "./dates";
 import { sendBookingMessage } from "./notifications";
 import { DEFAULT_SETTINGS, taxSlabsOf } from "./settings";
-import { MEAL_PLAN_LABELS, type PropertySettings, type RatePlan, type RoomType } from "./types";
+import {
+  MEAL_PLAN_LABELS,
+  type PropertySettings,
+  type RatePlan,
+  type RoomType,
+} from "./types";
 
-export type RequestState = { error?: string; success?: string };
+export type RequestState = {
+  error?: string;
+  success?: string;
+  /**
+   * A Razorpay hosted page for the deposit, when one is due and the gateway
+   * is configured (SOW Module 17: "Secure online payment for booking deposit
+   * or full payment"). Offered, never forced: the guest may still pay at the
+   * hotel, and the request stands either way.
+   */
+  payUrl?: string;
+  payAmount?: number;
+};
 
 /** One rate plan the guest can pick, priced for the stay asked about. */
 export interface PlanOffer {
@@ -49,6 +68,60 @@ export interface StayQuery {
 
 const PHONE = "+91 90700 90713";
 const OCCUPYING = ["tentative", "confirmed", "checked_in"];
+
+/**
+ * A hosted payment page for a website booking's deposit.
+ *
+ * Best-effort: a gateway that is not configured, or is having a bad day, must
+ * not lose the hotel a booking that has already been taken. On any failure
+ * the guest is simply not offered the link and pays at the hotel instead.
+ */
+async function depositLink(
+  bookingId: string,
+  reference: string,
+  amount: number,
+  settings: PropertySettings,
+  guest: { name: string; email: string; phone: string },
+): Promise<{ url: string } | null> {
+  if (!razorpayConfigured()) return null;
+
+  try {
+    const link = await createPaymentLink({
+      amount,
+      currency: settings.currency,
+      description: `Deposit for booking ${reference} at ${settings.name}`,
+      referenceId: `${reference}-${Date.now()}`,
+      customer: { name: guest.name, email: guest.email, phone: guest.phone ? normalisePhone(guest.phone) : "" },
+      notify: true,
+      expiresInMinutes: 60 * 24,
+      notes: { booking_id: bookingId, reference, purpose: "deposit" },
+    });
+    if (!link.ok || !link.data) return null;
+
+    const service = createServiceClient();
+    const { error } = await service.from("payment_transactions").insert({
+      booking_id: bookingId,
+      provider: "razorpay",
+      provider_link_id: link.data.id,
+      short_url: link.data.short_url,
+      purpose: "deposit",
+      amount,
+      currency: settings.currency,
+      status: "created",
+      expires_at: link.data.expire_by ? new Date(link.data.expire_by * 1000).toISOString() : null,
+    });
+    // Without the row the webhook cannot credit the folio, so an unrecorded
+    // link must not be handed out: the guest would pay into a void.
+    if (error) {
+      await cancelPaymentLink(link.data.id);
+      return null;
+    }
+
+    return { url: link.data.short_url };
+  } catch {
+    return null;
+  }
+}
 
 async function loadSettings(supabase: SupabaseClient): Promise<PropertySettings> {
   const { data } = await supabase.from("property_settings").select("*").maybeSingle();
@@ -170,6 +243,7 @@ async function buildQuote(supabase: SupabaseClient, q: StayQuery): Promise<StayQ
       seasons: pricing.seasons,
       restrictions: pricing.restrictions,
       extraCharges: pricing.extraCharges,
+      adjustments: pricing.adjustments,
     });
     if (quote.violations.length) {
       firstProblem ||= quote.violations.join(" ");
@@ -286,10 +360,34 @@ export async function submitBookingRequest(_prev: RequestState, formData: FormDa
       seasons: pricing.seasons,
       restrictions: pricing.restrictions,
       extraCharges: pricing.extraCharges,
+      adjustments: pricing.adjustments,
     });
 
     const settings = await loadSettings(supabase);
     let status: "tentative" | "waitlisted" = quote.status === "waitlist" ? "waitlisted" : "tentative";
+
+    // A promo code typed on the public site: only a public code counts, and
+    // the discount is worked out here rather than trusted from the form.
+    const typedCode = get("promo_code", 40).toUpperCase();
+    const promo = await resolvePromo(
+      supabase,
+      typedCode,
+      {
+        checkIn: q.checkIn,
+        checkOut: q.checkOut,
+        roomTypeId: roomType.id,
+        ratePlanId: plan.id,
+        amount: priced.total,
+        today: todayIn(settings.timezone),
+      },
+      { publicOnly: true, email },
+    );
+
+    // The discount goes into the nightly rates so the folio bills it and the
+    // tax follows it; see discountNights.
+    const nights = discountNights(priced.nights, promo.discount, q.rooms);
+    const total = nightsTotal(nights, q.rooms);
+    const discountGiven = priced.total - total;
 
     const row = {
       check_in: q.checkIn,
@@ -299,11 +397,13 @@ export async function submitBookingRequest(_prev: RequestState, formData: FormDa
       rooms_count: q.rooms,
       room_type_id: roomType.id,
       rate_plan_id: plan.id,
-      quoted_rate: priced.averageNightly,
-      total_amount: priced.total,
-      rate_breakdown: priced.nights,
-      deposit_required: priced.deposit,
-      promo_code: get("promo_code", 40).toUpperCase(),
+      quoted_rate: nights.length ? Math.round(total / q.rooms / nights.length) : 0,
+      total_amount: total,
+      promo_code_id: promo.codeId,
+      promo_discount: discountGiven,
+      rate_breakdown: nights,
+      deposit_required: Math.round((total * Number(plan.deposit_percent)) / 100),
+      promo_code: typedCode,
       special_requests: get("special_requests", 2000),
       contact_name: name,
       contact_email: email,
@@ -326,6 +426,10 @@ export async function submitBookingRequest(_prev: RequestState, formData: FormDa
       return { error: `We could not send that request. Please call us on ${PHONE}.` };
     }
 
+    // The code is spent by the booking itself: the redemption row follows
+    // bookings.promo_code_id in the database (0020_revenue.sql), and comes
+    // back if the request is later cancelled.
+
     await sendBookingMessage(
       supabase,
       "request_received",
@@ -334,11 +438,26 @@ export async function submitBookingRequest(_prev: RequestState, formData: FormDa
       { sms: false },
     );
 
+    const promoNote = promo.codeId
+      ? ` ${typedCode} has been applied, saving ₹${discountGiven.toLocaleString("en-IN")}.`
+      : typedCode && promo.reason
+        ? ` We could not apply ${typedCode}: ${promo.reason}`
+        : "";
+
+    // Offer the deposit online while the guest is still here. A waitlisted
+    // request holds no room, so there is nothing to take money for yet.
+    const deposit = Number(row.deposit_required ?? 0);
+    const payment =
+      status === "tentative" && deposit > 0
+        ? await depositLink(data.id, data.reference, deposit, settings, { name, email, phone })
+        : null;
+
     return {
       success:
-        status === "waitlisted"
+        (status === "waitlisted"
           ? "Thank you. Those dates are fully booked online, so we have added you to our waiting list — our front desk will contact you if a room opens up."
-          : "Thank you — we have your request. Our front desk will confirm availability with you shortly.",
+          : "Thank you — we have your request. Our front desk will confirm availability with you shortly.") + promoNote,
+      ...(payment ? { payUrl: payment.url, payAmount: deposit } : {}),
     };
   } catch {
     return { error: `We could not send that request. Please call us on ${PHONE}.` };

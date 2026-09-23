@@ -193,6 +193,144 @@ export default async function SettingsPage() {
         </Card>
 
         <Card className="p-5 space-y-4">
+          <SectionTitle>Notifications</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field label="Pre-arrival reminder (days before)" hint="0 = do not send it.">
+              <input
+                type="number"
+                name="notify_pre_arrival_days"
+                min={0}
+                max={30}
+                defaultValue={s.notify_pre_arrival_days}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Check-in instructions (days before)" hint="Times, ID needed, how to reach us. 0 = off.">
+              <input
+                type="number"
+                name="notify_checkin_days"
+                min={0}
+                max={30}
+                defaultValue={s.notify_checkin_days}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Thank-you & feedback (days after)" hint="Sent after departure with the feedback link. 0 = off.">
+              <input
+                type="number"
+                name="notify_post_stay_days"
+                min={0}
+                max={30}
+                defaultValue={s.notify_post_stay_days}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <div className="flex flex-wrap gap-6">
+            <Check
+              name="notify_staff_new_booking"
+              defaultChecked={s.notify_staff_new_booking}
+              label="Tell the team about new bookings"
+            />
+            <Check
+              name="notify_staff_vip_arrival"
+              defaultChecked={s.notify_staff_vip_arrival}
+              label="Alert the desk when a VIP arrives today"
+            />
+            <Check
+              name="notify_staff_ticket_assigned"
+              defaultChecked={s.notify_staff_ticket_assigned}
+              label="Tell staff when a maintenance ticket is assigned to them"
+            />
+          </div>
+          <Notice>
+            The three timed guest messages go out from the nightly job, which needs{" "}
+            <span className="font-mono">CRON_SECRET</span> set. Wording for every message is edited under{" "}
+            <Link href="/admin/settings/templates" className="text-yellow-700 underline">
+              Templates
+            </Link>
+            , per language. Email needs <span className="font-mono">RESEND_API_KEY</span> and SMS needs the Twilio
+            keys; without them each attempt is still recorded as &ldquo;not configured&rdquo; so nothing is lost
+            silently.
+          </Notice>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <SectionTitle>Guest booking portal</SectionTitle>
+          <Field
+            label="Best-rate guarantee message"
+            hint="Shown on the booking panel (SOW Module 17). Leave empty to show nothing."
+          >
+            <textarea
+              name="best_rate_message"
+              rows={2}
+              defaultValue={s.best_rate_message}
+              className={inputClass}
+            />
+          </Field>
+          <Notice>
+            Guests sign in to <span className="font-medium">/account</span> with a one-time code
+            emailed to them — there is no password to reset. A guest who books by phone or at the
+            desk sees that stay as soon as they sign in with the same email address.
+          </Notice>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <SectionTitle>Revenue &amp; dynamic pricing</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <Field
+              label="Approve changes over (%)"
+              hint="A rule's rate change this size or smaller goes live on its own. 0 = every change is approved by hand."
+            >
+              <input
+                type="number"
+                name="revenue_auto_approve_percent"
+                min={0}
+                max={100}
+                step="0.01"
+                defaultValue={s.revenue_auto_approve_percent}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Forecast horizon (nights)" hint="How far ahead the forecast looks and the rules price.">
+              <input
+                type="number"
+                name="revenue_forecast_days"
+                min={7}
+                max={365}
+                defaultValue={s.revenue_forecast_days}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Never sell below (₹)" hint="Holds every pricing rule above this. 0 = no floor.">
+              <input
+                type="number"
+                name="revenue_floor_rate"
+                min={0}
+                step="1"
+                defaultValue={s.revenue_floor_rate}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Never sell above (₹)" hint="Holds every pricing rule below this. 0 = no ceiling.">
+              <input
+                type="number"
+                name="revenue_ceiling_rate"
+                min={0}
+                step="1"
+                defaultValue={s.revenue_ceiling_rate}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <Notice>
+            The floor and ceiling are the last word on any rule&apos;s output, so a mistyped rule can embarrass the
+            hotel by a little rather than by a lot. Each waiting change is judged against the threshold that was in
+            force when the rules ran, so raising it here does not approve what is already in the queue.
+          </Notice>
+        </Card>
+
+        <Card className="p-5 space-y-4">
           <SectionTitle>Events &amp; banquets</SectionTitle>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field

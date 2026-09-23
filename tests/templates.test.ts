@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TEMPLATES, pickTemplate, renderTemplate, unknownPlaceholders } from "../app/lib/message-templates";
-import { guestTags } from "../app/lib/types";
+import {
+  DEFAULT_TEMPLATES,
+  TEMPLATE_LABELS,
+  pickTemplate,
+  renderTemplate,
+  unknownPlaceholders,
+} from "../app/lib/message-templates";
+import { guestTags, TIMED_TEMPLATES } from "../app/lib/types";
 import type { MessageTemplate } from "../app/lib/types";
 
 describe("renderTemplate", () => {
@@ -42,5 +48,84 @@ describe("guestTags", () => {
       "Corporate",
     ]);
     expect(guestTags({ tags: [], company_id: null }, { stays: 1 })).toEqual([]);
+  });
+});
+
+// ── Module 16: the full set of messages ─────────────────────────────────────
+
+describe("the notification engine's templates", () => {
+  const KEYS = [
+    "request_received",
+    "confirmation",
+    "cancellation",
+    "final_bill",
+    "pre_arrival",
+    "checkin_instructions",
+    "post_stay",
+    "payment_receipt",
+    "booking_modified",
+  ] as const;
+
+  it("covers every message the SOW names", () => {
+    for (const key of KEYS) {
+      expect(DEFAULT_TEMPLATES[key], `missing default for ${key}`).toBeTruthy();
+      expect(TEMPLATE_LABELS[key], `missing label for ${key}`).toBeTruthy();
+    }
+  });
+
+  it("gives every message a subject and an SMS, so neither channel is blank", () => {
+    for (const key of KEYS) {
+      expect(DEFAULT_TEMPLATES[key].subject.trim(), `${key} subject`).not.toBe("");
+      expect(DEFAULT_TEMPLATES[key].sms.trim(), `${key} sms`).not.toBe("");
+    }
+  });
+
+  it("uses no placeholder the editor cannot explain", () => {
+    // A placeholder missing from PLACEHOLDERS would render literally in a
+    // guest's email, and the editor would warn about the hotel's own wording.
+    for (const key of KEYS) {
+      const t = DEFAULT_TEMPLATES[key];
+      const all = [t.subject, t.body, t.footer, t.sms].join("\n");
+      expect(unknownPlaceholders(all), `${key} has unknown placeholders`).toEqual([]);
+    }
+  });
+
+  it("names the timed messages the nightly job sends", () => {
+    expect([...TIMED_TEMPLATES]).toEqual(["pre_arrival", "checkin_instructions", "post_stay"]);
+    for (const key of TIMED_TEMPLATES) {
+      expect(DEFAULT_TEMPLATES[key]).toBeTruthy();
+    }
+  });
+
+  it("puts the feedback link only in the messages that follow a stay", () => {
+    const mentions = (key: (typeof KEYS)[number]) =>
+      [DEFAULT_TEMPLATES[key].body, DEFAULT_TEMPLATES[key].footer, DEFAULT_TEMPLATES[key].sms]
+        .join("\n")
+        .includes("{FeedbackLink}");
+    expect(mentions("post_stay")).toBe(true);
+    expect(mentions("final_bill")).toBe(true);
+    expect(mentions("pre_arrival")).toBe(false);
+    expect(mentions("confirmation")).toBe(false);
+  });
+
+  it("drops the feedback line when a guest has already given feedback", () => {
+    // feedbackLinkFor returns null once the form is submitted, so the
+    // thank-you must not go out with a dangling "tell us how we did:".
+    const t = DEFAULT_TEMPLATES.post_stay;
+    const rendered = renderTemplate(t.footer, { FeedbackLink: "" });
+    expect(rendered).toBe("");
+  });
+
+  it("asks a payment receipt for the amount and the balance", () => {
+    const t = DEFAULT_TEMPLATES.payment_receipt;
+    const all = [t.body, t.footer, t.sms].join("\n");
+    expect(all).toContain("{Amount}");
+    expect(all).toContain("{Balance}");
+  });
+
+  it("tells a guest the times in the check-in instructions", () => {
+    const t = DEFAULT_TEMPLATES.checkin_instructions;
+    expect(t.body).toContain("{CheckInTime}");
+    expect(t.body).toContain("{CheckOutTime}");
   });
 });

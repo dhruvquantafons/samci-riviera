@@ -51,11 +51,13 @@ export default async function RatePlansPage() {
                 {manage && <span className="ml-auto text-[11px] text-yellow-700">Edit</span>}
               </div>
               <p className="text-xs text-slate-600 mt-1">
-                {Number(plan.adjustment_value) === 0
-                  ? "Base rate"
-                  : plan.adjustment_kind === "percent"
-                    ? `${Number(plan.adjustment_value) > 0 ? "+" : ""}${Number(plan.adjustment_value)}% on base rate`
-                    : `${Number(plan.adjustment_value) > 0 ? "+" : "−"}₹${Math.abs(Number(plan.adjustment_value))} per night`}
+                {plan.adjustment_kind === "fixed"
+                  ? `₹${Number(plan.adjustment_value).toLocaleString("en-IN")} per night, all in`
+                  : Number(plan.adjustment_value) === 0
+                    ? "Base rate"
+                    : plan.adjustment_kind === "percent"
+                      ? `${Number(plan.adjustment_value) > 0 ? "+" : ""}${Number(plan.adjustment_value)}% on base rate`
+                      : `${Number(plan.adjustment_value) > 0 ? "+" : "−"}₹${Math.abs(Number(plan.adjustment_value))} per night`}
                 {" · "}
                 {plan.is_refundable
                   ? `free cancellation to ${plan.free_cancellation_hours}h, then ${describePenalty(plan.cancellation_penalty, plan.cancellation_penalty_percent)}`
@@ -127,9 +129,10 @@ function PlanFields({
           <select name="adjustment_kind" defaultValue={plan?.adjustment_kind ?? "percent"} className={inputClass}>
             <option value="percent">Percent of base rate</option>
             <option value="amount">Amount per night (₹)</option>
+            <option value="fixed">Fixed rate per night (₹)</option>
           </select>
         </Field>
-        <Field label="Adjustment" hint="-10 = 10% off. +1500 for a package.">
+        <Field label="Adjustment" hint="-10 = 10% off. +1500 for a package. With a fixed rate, the nightly price itself.">
           <input type="number" name="adjustment_value" step="0.01" defaultValue={plan?.adjustment_value ?? 0} className={inputClass} />
         </Field>
         <Field label="Company" hint="Corporate plans only.">

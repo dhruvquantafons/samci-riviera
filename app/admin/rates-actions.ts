@@ -276,7 +276,7 @@ export async function saveRatePlan(_prev: ActionState, fd: FormData): Promise<Ac
     rate_type: rateType,
     description: str(fd, "description", 1000),
     meal_plan: oneOf(fd, "meal_plan", ["EP", "CP", "MAP", "AP"] as const, "CP"),
-    adjustment_kind: oneOf(fd, "adjustment_kind", ["percent", "amount"] as const, "percent"),
+    adjustment_kind: oneOf(fd, "adjustment_kind", ["percent", "amount", "fixed"] as const, "percent"),
     adjustment_value: num(fd, "adjustment_value") ?? 0,
     room_type_ids: fd.getAll("room_type_ids").map(String).filter((v) => /^[0-9a-f-]{36}$/i.test(v)),
     company_id: rateType === "corporate" ? companyId : null,

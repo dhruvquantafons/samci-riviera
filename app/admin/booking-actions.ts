@@ -7,11 +7,13 @@ import { createClient } from "../lib/supabase/server";
 import { requirePermission, requireAnyPermission } from "../lib/auth";
 import { can } from "../lib/permissions";
 import { getSettings } from "../lib/settings";
-import { loadPricingData } from "../lib/rate-data";
+import { loadPricingData, resolvePromo } from "../lib/rate-data";
 import { quoteStay, flatBreakdown } from "../lib/pricing";
+import { discountNights, nightsTotal } from "../lib/revenue";
 import { cancellationPenalty, noShowPenalty, describePenalty } from "../lib/policies";
 import { friendlyDbError, isOverbooked } from "../lib/db-errors";
 import { sendBookingMessage, describeSend, type Template } from "../lib/notifications";
+import { alertNewBooking } from "../lib/staff-alerts";
 import { eachNight, hoursUntil, todayIn } from "../lib/dates";
 import type {
   Booking,
@@ -84,6 +86,31 @@ function messageFields(b: BookingWithPlan) {
     meal_plan: b.rate_plans?.meal_plan ?? null,
     cancellation_policy: cancellationPolicyText(b.rate_plans),
   };
+}
+
+/**
+ * Emails a receipt for a payment just taken, with the balance that is left.
+ *
+ * The balance is read back from the folio rather than worked out here, so the
+ * figure the guest is told matches the one the desk sees.
+ */
+async function sendPaymentReceipt(
+  supabase: SupabaseClient,
+  bookingId: string,
+  amount: number,
+  staffId: string,
+) {
+  const [booking, settings] = await Promise.all([loadBooking(supabase, bookingId), getSettings()]);
+  if (!booking) return "Booking not found.";
+
+  const { data: balance } = await supabase.rpc("folio_balance", { p_booking: bookingId });
+
+  const summary = await sendBookingMessage(supabase, "payment_receipt", messageFields(booking), settings, {
+    staffId,
+    amount,
+    bill: { lines: [], balance: Number(balance ?? 0) },
+  });
+  return describeSend(summary);
 }
 
 async function sendMessage(
@@ -191,6 +218,7 @@ export async function createBooking(_prev: ActionState, fd: FormData): Promise<A
     seasons: pricing.seasons,
     restrictions: pricing.restrictions,
     extraCharges: pricing.extraCharges,
+    adjustments: pricing.adjustments,
   });
 
   const overrideRestrictions = bool(fd, "override_restrictions") && can(session, "bookings.overbook");
@@ -206,7 +234,33 @@ export async function createBooking(_prev: ActionState, fd: FormData): Promise<A
     if (rateOverride < 0) return { error: "Enter a valid nightly rate." };
     breakdown = flatBreakdown(checkIn, checkOut, rateOverride);
   }
-  const total = breakdown.reduce((s, n) => s + n.rate, 0) * rooms;
+  const grossTotal = breakdown.reduce((s, n) => s + n.rate, 0) * rooms;
+
+  // A promo code the desk has typed in. Checked here rather than trusted from
+  // the form, and refused out loud: unlike the public site, the person at the
+  // desk can fix a wrong code and try again.
+  const typedPromo = str(fd, "promo_code", 40).toUpperCase();
+  const promo = await resolvePromo(
+    supabase,
+    typedPromo,
+    {
+      checkIn,
+      checkOut,
+      roomTypeId,
+      ratePlanId,
+      amount: grossTotal,
+      today: todayIn(settings.timezone),
+    },
+    { email },
+  );
+  if (typedPromo && !promo.codeId && promo.reason) return { error: promo.reason };
+
+  // The discount goes into the nightly rates, not just the total, so the folio
+  // bills the discounted figure and the tax follows it.
+  breakdown = discountNights(breakdown, promo.discount, rooms);
+  const total = nightsTotal(breakdown, rooms);
+  // What was actually given, after the rupee rounding above.
+  const discountGiven = grossTotal - total;
   const average = breakdown.length ? Math.round(total / rooms / breakdown.length) : 0;
   const deposit = Math.round((total * Number(plan.deposit_percent)) / 100);
 
@@ -260,7 +314,9 @@ export async function createBooking(_prev: ActionState, fd: FormData): Promise<A
       status,
       source: oneOf(fd, "source", SOURCES, "phone"),
       payment_method: paymentMethod,
-      promo_code: str(fd, "promo_code", 40),
+      promo_code: typedPromo,
+      promo_code_id: promo.codeId,
+      promo_discount: discountGiven,
       quoted_rate: average,
       total_amount: total,
       rate_breakdown: breakdown,
@@ -280,12 +336,15 @@ export async function createBooking(_prev: ActionState, fd: FormData): Promise<A
       overbook_reason: overbookReason,
       created_by: session.staff.id,
     })
-    .select("id")
+    .select("id, reference")
     .single();
 
   if (error) {
     return { error: friendlyDbError(error.message), overbooked: isOverbooked(error.message) };
   }
+
+  // The redemption row follows the booking's promo_code_id in the database
+  // (0020_revenue.sql), so there is nothing to record here.
 
   // Deposit taken while on the phone.
   const depositPaid = num(fd, "deposit_amount");
@@ -305,6 +364,25 @@ export async function createBooking(_prev: ActionState, fd: FormData): Promise<A
 
   if (status === "confirmed" && bool(fd, "send_confirmation")) {
     await sendMessage(supabase, "confirmation", data.id, session.staff.id);
+  }
+
+  // SOW Module 16, trigger event "booking created".
+  if (settings.notify_staff_new_booking) {
+    await alertNewBooking(
+      supabase,
+      {
+        id: data.id,
+        reference: data.reference,
+        contact_name: name,
+        check_in: checkIn,
+        check_out: checkOut,
+        rooms_count: rooms,
+        total_amount: total,
+        source: oneOf(fd, "source", SOURCES, "phone"),
+        room_type_name: roomType.name,
+      },
+      session.staff.id,
+    );
   }
 
   revalidateBooking();
@@ -535,6 +613,7 @@ export async function updateBookingDetails(_prev: ActionState, fd: FormData): Pr
       seasons: pricing.seasons,
       restrictions: pricing.restrictions,
       extraCharges: pricing.extraCharges,
+      adjustments: pricing.adjustments,
     });
     violations = quote.violations;
     // Nights already stayed keep the price they were sold at.
@@ -600,8 +679,23 @@ export async function updateBookingDetails(_prev: ActionState, fd: FormData): Pr
 
   if (error) return { error: friendlyDbError(error.message), overbooked: isOverbooked(error.message) };
 
+  // SOW Module 16, trigger event "booking modified". Only worth telling the
+  // guest when the stay itself moved — a corrected phone number is not news,
+  // and a message about it would only worry them.
+  const moved =
+    checkIn !== booking.check_in ||
+    checkOut !== booking.check_out ||
+    roomTypeId !== booking.room_type_id ||
+    ratePlanId !== booking.rate_plan_id ||
+    rooms !== booking.rooms_count;
+
+  let told = "";
+  if (moved && bool(fd, "notify_guest")) {
+    told = " " + (await sendMessage(supabase, "booking_modified", booking.id, session.staff.id));
+  }
+
   revalidateBooking(booking.id);
-  return { success: "Booking updated. The change is recorded in its history." };
+  return { success: `Booking updated. The change is recorded in its history.${told}` };
 }
 
 // ── Rooms: assign, move, split ─────────────────────────────────────────────
@@ -863,8 +957,18 @@ export async function recordPayment(_prev: ActionState, fd: FormData): Promise<A
   });
   if (error) return { error: friendlyDbError(error.message) };
 
+  // SOW Module 16, trigger event "payment received". A refund is not a
+  // receipt, so only a payment sends one, and only when asked: the desk
+  // takes plenty of payments the guest is standing right there for.
+  let sent = "";
+  if (kind === "payment" && bool(fd, "send_receipt")) {
+    sent = " " + (await sendPaymentReceipt(supabase, bookingId, amount, session.staff.id));
+  }
+
   revalidateBooking(bookingId);
-  return { success: `${kind === "refund" ? "Refund" : "Payment"} of ₹${amount.toLocaleString("en-IN")} recorded.` };
+  return {
+    success: `${kind === "refund" ? "Refund" : "Payment"} of ₹${amount.toLocaleString("en-IN")} recorded.${sent}`,
+  };
 }
 
 export async function postCharge(_prev: ActionState, fd: FormData): Promise<ActionState> {

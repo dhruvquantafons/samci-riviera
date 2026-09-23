@@ -146,6 +146,11 @@ export default function EditBookingForm({
       <div className="flex flex-wrap gap-6">
         <Check name="is_vip" defaultChecked={booking.is_vip} label="VIP" />
         <Check name="reprice" label="Re-price from current rates" hint="Even if nothing else changed." />
+        <Check
+          name="notify_guest"
+          label="Tell the guest"
+          hint="Emails the updated details, but only if the stay itself moved."
+        />
         {canOverbook && <Check name="override_restrictions" label="Override stay restrictions" />}
       </div>
     </ActionForm>

@@ -44,6 +44,10 @@ export default function Navbar() {
     { name: "Dining", href: "/dining" },
     { name: "Gallery", href: "/gallery" },
     { name: "About", href: "/about" },
+    // Reachable whether or not anyone is signed in; the page itself decides
+    // between the sign-in form and the guest's bookings, which keeps every
+    // other public page statically rendered.
+    { name: "My Bookings", href: "/account" },
   ];
 
   return (

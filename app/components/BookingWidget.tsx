@@ -13,12 +13,15 @@ import {
   Plus,
   Phone,
   Sparkles,
+  Languages,
   Building2,
   CheckCircle2,
   Send,
   Loader2,
 } from "lucide-react";
 import type { RoomType } from "../lib/types";
+import { LANGUAGES } from "../lib/types";
+import { stringsFor, isRtl } from "../lib/portal-i18n";
 import { toLocalIso } from "../lib/dates";
 import {
   submitBookingRequest,
@@ -34,6 +37,11 @@ interface BookingWidgetProps {
   roomTypes: RoomType[];
   /** Pre-selects a room when the guest arrived from a specific room card. */
   preselectedRoom?: string;
+  /** The hotel's best-rate guarantee wording, from Settings. */
+  bestRateMessage?: string;
+  /** Languages the property offers, and which one to open in. */
+  languages?: string[];
+  defaultLanguage?: string;
 }
 
 const MAX_ROOMS = 5;
@@ -53,7 +61,40 @@ export default function BookingWidget({
   onClose,
   roomTypes,
   preselectedRoom = "",
+  bestRateMessage = "",
+  languages = ["en"],
+  defaultLanguage = "en",
 }: BookingWidgetProps) {
+  /**
+   * The language is held here rather than in the URL so the marketing pages
+   * stay statically rendered — a ?lang= the server had to read would make
+   * every one of them dynamic and cost the SOW's three-second page load.
+   * Remembered per browser, so a returning guest opens where they left off.
+   */
+  // Read in the initialiser rather than an effect: this panel is only mounted
+  // after the visitor opens it, so it never renders on the server and there
+  // is no hydration to mismatch.
+  const [lang, setLang] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem("samci.lang");
+      return saved && languages.includes(saved) ? saved : defaultLanguage;
+    } catch {
+      // Private browsing, or storage turned off. The default is fine.
+      return defaultLanguage;
+    }
+  });
+
+  const chooseLang = (next: string) => {
+    setLang(next);
+    try {
+      window.localStorage.setItem("samci.lang", next);
+    } catch {
+      // Not being able to remember it is not worth failing over.
+    }
+  };
+
+  const t = stringsFor(lang, languages);
+
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
@@ -195,6 +236,7 @@ export default function BookingWidget({
       {/* Booking Popup Card Container */}
       <div
         ref={widgetRef}
+        dir={isRtl(lang) ? "rtl" : undefined}
         className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-[0_25px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-panel border border-[#e5e0d8] my-auto"
       >
         {/* ── CARD HEADER with prominent CROSS (X) BUTTON at Top Right ── */}
@@ -230,6 +272,24 @@ export default function BookingWidget({
             </div>
             <h4 className="font-serif text-xl text-[#1c1b1a] font-medium">Request received</h4>
             <p className="text-xs text-[#7a7771] leading-relaxed max-w-xs">{state.success}</p>
+
+            {state.payUrl && (
+              <div className="w-full pt-1 space-y-2">
+                <a
+                  href={state.payUrl}
+                  rel="noreferrer"
+                  className="block w-full bg-[#a88956] hover:bg-[#8f7343] text-white text-xs font-medium rounded-xl px-4 py-3 transition-colors"
+                >
+                  Pay the deposit now
+                  {state.payAmount ? ` — ${rupees(state.payAmount)}` : ""}
+                </a>
+                <p className="text-[10px] text-[#9a9490] leading-relaxed">
+                  Secured by Razorpay. Your card details are entered on their page and never reach
+                  us. You can also simply pay at the hotel.
+                </p>
+              </div>
+            )}
+
             <a
               href="tel:+919070090713"
               className="inline-flex items-center gap-2 text-xs text-[#a88956] hover:text-[#8f7343] transition-colors pt-2"
@@ -243,12 +303,40 @@ export default function BookingWidget({
           </div>
         ) : (
         <form action={formAction} onSubmit={keepFormOnSubmit(formAction)} className="p-6 space-y-4">
-          {/* Tagline / direct booking benefit */}
-          <div className="bg-[#faf8f5] border border-[#eee8df] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-[#5a5854]">
-            <span className="flex items-center gap-1.5 font-medium text-[#1c1b1a]">
-              <Sparkles className="w-3.5 h-3.5 text-[#a88956]" /> Direct Reservation
-            </span>
-            <span className="text-[#a88956] font-semibold text-[11px]">Best Rate Guaranteed</span>
+          {/* Direct booking benefit, and the hotel's own best-rate wording
+              underneath it (SOW Module 17: "best-rate guarantee messaging"). */}
+          <div className="bg-[#faf8f5] border border-[#eee8df] rounded-xl px-4 py-2.5 text-xs text-[#5a5854]">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-medium text-[#1c1b1a]">
+                <Sparkles className="w-3.5 h-3.5 text-[#a88956]" /> Direct Reservation
+              </span>
+              <span className="text-[#a88956] font-semibold text-[11px]">Best Rate Guaranteed</span>
+            </div>
+            {bestRateMessage && (
+              <p className="text-[10px] text-[#7a7771] leading-relaxed mt-1.5 pt-1.5 border-t border-[#eee8df]">
+                {bestRateMessage}
+              </p>
+            )}
+            {languages.length > 1 && (
+              <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-[#eee8df]">
+                <Languages className="w-3 h-3 text-[#a88956] shrink-0" />
+                <label htmlFor="booking-lang" className="sr-only">
+                  Language
+                </label>
+                <select
+                  id="booking-lang"
+                  value={lang}
+                  onChange={(e) => chooseLang(e.target.value)}
+                  className="text-[10px] bg-transparent text-[#5a5854] focus:outline-none cursor-pointer"
+                >
+                  {languages.map((code) => (
+                    <option key={code} value={code}>
+                      {LANGUAGES[code] ?? code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Form Fields Stack */}
@@ -285,7 +373,7 @@ export default function BookingWidget({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-[#7a7771] font-semibold block mb-1">
-                        Check-In Date
+                        {t.checkIn}
                       </label>
                       <input
                         type="date"
@@ -304,7 +392,7 @@ export default function BookingWidget({
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-[#7a7771] font-semibold block mb-1">
-                        Check-Out Date
+                        {t.checkOut}
                       </label>
                       <input
                         type="date"
@@ -355,9 +443,9 @@ export default function BookingWidget({
               {/* Guests Counter Popover */}
               {guestOpen && (
                 <div className="p-4 bg-[#faf8f5] border-t border-[#ede9e2] animate-slide-down">
-                  {renderCounter("Adults", "Age 11+ years", guestsAdults, 1, maxAdults, setAdults)}
-                  {renderCounter("Children", "Age 5–10 years", guestsChildren, 0, maxChildren, setChildren)}
-                  {renderCounter("Rooms", "Number of rooms required", rooms, 1, MAX_ROOMS, setRooms)}
+                  {renderCounter(t.adults, "Age 11+ years", guestsAdults, 1, maxAdults, setAdults)}
+                  {renderCounter(t.children, "Age 5–10 years", guestsChildren, 0, maxChildren, setChildren)}
+                  {renderCounter(t.rooms, "Number of rooms required", rooms, 1, MAX_ROOMS, setRooms)}
                   {roomType && (
                     <p className="text-[11px] text-[#9a9490] pt-2">
                       {roomType.name}: up to {roomType.max_adults} adult{roomType.max_adults !== 1 ? "s" : ""}
@@ -383,7 +471,7 @@ export default function BookingWidget({
               <Tag className="w-4 h-4 text-[#a88956] shrink-0" />
               <span className="flex-1 min-w-0">
                 <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold">
-                  Promo Code (optional)
+                  {t.promoCodeOptional}
                 </span>
                 <input
                   name="promo_code"
@@ -477,7 +565,7 @@ export default function BookingWidget({
                               {rupees(p.total)}
                             </span>
                             <span className="block text-[10px] text-[#9a9490]">
-                              {rupees(p.perNight)} / room / night
+                              {rupees(p.perNight)} / room / {t.night}
                             </span>
                           </span>
                         </span>
@@ -495,7 +583,7 @@ export default function BookingWidget({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
                 <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold mb-1">
-                  Your name
+                  {t.yourName}
                 </span>
                 <input
                   name="contact_name"
@@ -506,7 +594,7 @@ export default function BookingWidget({
               </label>
               <label className="block">
                 <span className="block text-[10px] uppercase tracking-wider text-[#9a9490] font-semibold mb-1">
-                  Phone
+                  {t.yourPhone}
                 </span>
                 <input
                   name="contact_phone"

@@ -47,6 +47,7 @@ export default async function NewBookingPage({
           seasons={pricing.seasons}
           restrictions={pricing.restrictions}
           extraCharges={pricing.extraCharges}
+          adjustments={pricing.adjustments}
           companies={companies}
           defaults={{
             checkIn,

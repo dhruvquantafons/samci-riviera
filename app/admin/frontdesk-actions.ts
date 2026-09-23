@@ -1,11 +1,11 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "../lib/supabase/server";
+import { feedbackLinkFor } from "../lib/feedback-link";
 import { requirePermission, type Session } from "../lib/auth";
 import { can } from "../lib/permissions";
 import { getSettings } from "../lib/settings";
@@ -16,7 +16,6 @@ import { postRoomCharges, nightsBefore, loadFolio, billLines } from "../lib/foli
 import { addDays, eachNight, nowTimeIn, todayIn, zonedTime } from "../lib/dates";
 import { sendKeyCardCommand } from "../lib/integrations";
 import { sendBookingMessage, describeSend } from "../lib/notifications";
-import { SITE } from "../lib/site";
 import type { Booking, PaymentMethod } from "../lib/types";
 import {
   type ActionState,
@@ -464,22 +463,6 @@ export async function checkOut(_prev: ActionState, fd: FormData): Promise<Action
 }
 
 /** The guest's private feedback link for a stay, created on first use. */
-async function feedbackLinkFor(supabase: SupabaseClient, bookingId: string, guestId: string | null) {
-  const { data: existing } = await supabase
-    .from("guest_feedback")
-    .select("token, submitted_at")
-    .eq("booking_id", bookingId)
-    .maybeSingle();
-  if (existing?.submitted_at) return null;
-  let token = existing?.token as string | null | undefined;
-  if (!existing) {
-    token = randomBytes(24).toString("base64url");
-    const { error } = await supabase.from("guest_feedback").insert({ booking_id: bookingId, guest_id: guestId, token });
-    if (error) return null;
-  }
-  return token ? `${SITE.url}/feedback/${token}` : null;
-}
-
 export async function reissueKeys(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const session = await requirePermission("frontdesk.checkin");
   const supabase = await createClient();

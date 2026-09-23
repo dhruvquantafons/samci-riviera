@@ -16,7 +16,7 @@ import {
   MEAL_PLAN_LABELS,
   RATE_TYPE_LABELS,
 } from "../../../../lib/types";
-import { quoteStay } from "../../../../lib/pricing";
+import { quoteStay, type LiveAdjustment } from "../../../../lib/pricing";
 import { createBooking } from "../../../booking-actions";
 import type { ActionState } from "../../../form-utils";
 import { Field, inputClass, buttonClass, Banner, Check, fmtMoney, fmtDate } from "../../../components/ui";
@@ -30,6 +30,7 @@ export default function NewBookingForm({
   seasons,
   restrictions,
   extraCharges,
+  adjustments,
   companies,
   defaults,
   canOverbook,
@@ -41,6 +42,7 @@ export default function NewBookingForm({
   seasons: RateSeason[];
   restrictions: RateRestriction[];
   extraCharges: ExtraCharge[];
+  adjustments: LiveAdjustment[];
   companies: Company[];
   defaults: { checkIn: string; checkOut: string; source: string; roomTypeId: string; walkIn: boolean };
   canOverbook: boolean;
@@ -83,6 +85,7 @@ export default function NewBookingForm({
       seasons,
       restrictions,
           extraCharges,
+          adjustments,
         });
 
   const override = rateOverride.trim() === "" ? null : Number(rateOverride);

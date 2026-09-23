@@ -63,7 +63,7 @@ function compose(
   text: Omit<MessageTemplate, "template" | "language">,
   b: BookingForMessage,
   hotel: PropertySettings,
-  extra: { bill?: { lines: BillLine[]; balance: number }; feedbackLink?: string },
+  extra: { bill?: { lines: BillLine[]; balance: number }; feedbackLink?: string; amount?: number },
 ) {
   const first = (b.contact_name || "Guest").split(" ")[0];
   const stay = `${longDate(b.check_in)} to ${longDate(b.check_out)}`;
@@ -84,6 +84,9 @@ function compose(
     HotelPhone: hotel.phone,
     HotelEmail: hotel.email,
     FeedbackLink: extra.feedbackLink ?? "",
+    Amount: extra.amount === undefined ? "" : money(extra.amount),
+    CheckInTime: hhmm(hotel.check_in_time),
+    CheckOutTime: hhmm(hotel.check_out_time),
   };
 
   // The details table is built from the booking; the words around it come
@@ -111,6 +114,19 @@ function compose(
       for (const line of extra.bill?.lines ?? []) rows.push([line.label, money(line.amount)]);
       rows.push(["Balance", money(extra.bill?.balance ?? 0)]);
       break;
+    case "pre_arrival":
+    case "checkin_instructions":
+      rows.push(["Check-in / out", `from ${hhmm(hotel.check_in_time)} / by ${hhmm(hotel.check_out_time)}`]);
+      break;
+    case "booking_modified":
+      rows.push(["Total", money(b.total_amount)]);
+      rows.push(["Check-in / out", `from ${hhmm(hotel.check_in_time)} / by ${hhmm(hotel.check_out_time)}`]);
+      break;
+    case "payment_receipt":
+      if (extra.amount !== undefined) rows.push(["Payment received", money(extra.amount)]);
+      rows.push(["Balance", money(extra.bill?.balance ?? 0)]);
+      break;
+    // post_stay carries no figures: it is a thank-you, not a statement.
   }
 
   const subject = renderTemplate(text.subject, values);
@@ -206,6 +222,8 @@ export async function sendBookingMessage(
     bill?: { lines: BillLine[]; balance: number };
     sms?: boolean;
     feedbackLink?: string;
+    /** The payment just taken, for a receipt. */
+    amount?: number;
   } = {},
 ): Promise<SendSummary> {
   // The guest's language when a template exists for it, else the property's.
@@ -219,7 +237,11 @@ export async function sendBookingMessage(
     (guest as { language?: string } | null)?.language,
     hotel.default_language,
   ]);
-  const message = compose(template, text, booking, hotel, { bill: options.bill, feedbackLink: options.feedbackLink });
+  const message = compose(template, text, booking, hotel, {
+    bill: options.bill,
+    feedbackLink: options.feedbackLink,
+    amount: options.amount,
+  });
   const summary: SendSummary = { email: null, sms: null };
   const rows: Record<string, unknown>[] = [];
 
@@ -232,6 +254,8 @@ export async function sendBookingMessage(
     });
     rows.push({
       booking_id: booking.id,
+      guest_id: booking.guest_id ?? null,
+      kind: "guest",
       channel: "email",
       template,
       recipient: booking.contact_email,
@@ -248,6 +272,8 @@ export async function sendBookingMessage(
     summary.sms = await sendSms({ to: booking.contact_phone, body: message.sms });
     rows.push({
       booking_id: booking.id,
+      guest_id: booking.guest_id ?? null,
+      kind: "guest",
       channel: "sms",
       template,
       recipient: booking.contact_phone,
