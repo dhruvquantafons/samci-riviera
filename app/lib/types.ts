@@ -77,7 +77,84 @@ export interface Staff {
   address?: string;
   emergency_contact?: string;
   sessions_revoked_at?: string | null;
+  /** The property this person belongs to (SOW Module 14). */
+  property_id?: string | null;
+  /** Head office: sees and works at every property in the group. */
+  all_properties?: boolean;
+  /** Which property they are currently looking at, if not their own. */
+  active_property_id?: string | null;
 }
+
+/**
+ * One hotel in the group (SOW Module 14).
+ *
+ * Carries every field of PropertySettings — before 0024 this was a single row
+ * called property_settings, and each property now holds its own copy — plus
+ * the handful that tell one property from another.
+ */
+export interface Property extends PropertySettings {
+  id: string;
+  code: string;
+  brand: string;
+  is_active: boolean;
+  /** Answers the public website and anything with no staff session behind it. */
+  is_default: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+/** A row of the central dashboard: one property's performance. */
+export interface GroupPerformance {
+  property_id: string;
+  code: string;
+  name: string;
+  brand: string;
+  nights: number;
+  rooms_available: number;
+  rooms_sold: number;
+  occupancy: number;
+  room_revenue: number;
+  total_revenue: number;
+  adr: number;
+  revpar: number;
+}
+
+/** Rooms free at each property, for taking a booking from one screen. */
+export interface GroupAvailability {
+  property_id: string;
+  code: string;
+  name: string;
+  room_type_id: string;
+  room_type: string;
+  free: number;
+}
+
+/** Head office's copy of the settings it can push to every property. */
+export interface GroupSettings {
+  group_name: string;
+  best_rate_message: string;
+  invoice_terms: string;
+  event_terms: string;
+  default_language: string;
+  languages: string[];
+  loyalty_enabled: boolean;
+  loyalty_program_name: string;
+  loyalty_expiry_months: number;
+  loyalty_min_redeem_points: number;
+  tax_inclusive: boolean;
+  tax_slabs: unknown;
+  tax_label: string;
+  updated_at: string;
+}
+
+/** What push_central_config() knows how to copy down. */
+export const CENTRAL_CONFIG_ITEMS = {
+  brand: "Brand standards — best-rate message, invoice and event terms, languages",
+  loyalty: "Loyalty programme rules — name, expiry, minimum redemption",
+  tax: "Tax template — slabs, label, inclusive or exclusive pricing",
+} as const;
+
+export type CentralConfigItem = keyof typeof CENTRAL_CONFIG_ITEMS;
 
 export interface RoomType {
   id: string;

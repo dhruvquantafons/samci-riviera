@@ -117,3 +117,87 @@ export async function signOutGuest() {
   const supabase = await createClient();
   await supabase.auth.signOut();
 }
+
+// ── The password option ─────────────────────────────────────────────────────
+
+/**
+ * Whether the deployment offers a password as well as an emailed code.
+ *
+ * A testing affordance, not a feature. A staging deployment can usually only
+ * email one address, which would otherwise leave the rest of a team unable to
+ * open the account page at all. Off unless switched on, so production gets the
+ * one-time code and nothing else.
+ */
+export function guestPasswordLoginEnabled(): boolean {
+  return process.env.GUEST_PASSWORD_LOGIN === "true";
+}
+
+/**
+ * Creates a login from an address and a password.
+ *
+ * Note what this does *not* buy: a password says nothing about whether the
+ * person owns the address. guest_link_account() knows that — it reads the
+ * token's amr claim and refuses to adopt an existing guest profile for a
+ * password session — so an account made here always starts empty, whatever
+ * address was typed. See 0023_guest_password_login.sql.
+ */
+export async function signUpGuestWithPassword(
+  email: string,
+  password: string,
+): Promise<{ error: string | null }> {
+  if (!guestPasswordLoginEnabled()) return { error: "Passwords are not available here." };
+  if (!hasSupabaseConfig()) {
+    return { error: "Guest accounts are not available at the moment. Please call us." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    // Read by handle_new_user() only to decline a staff row, as with the code
+    // flow. Never a reason to grant anything.
+    options: { data: { is_guest: true } },
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function signInGuestWithPassword(
+  email: string,
+  password: string,
+): Promise<{ error: string | null }> {
+  if (!guestPasswordLoginEnabled()) return { error: "Passwords are not available here." };
+  if (!hasSupabaseConfig()) {
+    return { error: "Guest accounts are not available at the moment. Please call us." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Attaches a password session to a guest profile.
+ *
+ * Separate from verifyGuestCode() only because there is no code to check
+ * first; the linking, and the cleanup when it fails, are the same.
+ */
+export async function linkGuestProfile(): Promise<{
+  /** No session to link: Supabase is holding the signup for email confirmation. */
+  unconfirmed: boolean;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("guest_link_account");
+  if (!error) return { unconfirmed: false, error: null };
+
+  // Raised by guest_link_account() when auth.uid() is null, which after a
+  // successful signup means only one thing: no session was issued because the
+  // project has "Confirm email" switched on.
+  if (error.message.includes("GUEST_NOT_SIGNED_IN")) {
+    return { unconfirmed: true, error: null };
+  }
+
+  await supabase.auth.signOut();
+  return {
+    unconfirmed: false,
+    error: "We could not open your account. Please call us and we will sort it out.",
+  };
+}

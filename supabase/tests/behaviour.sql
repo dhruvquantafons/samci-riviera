@@ -786,7 +786,7 @@ values (
   current_date - 1, 'completed', now(),
   '{"rooms": {"available": 99, "sold": 7}, "revenue": {"room": 70000, "fees": 0, "extras": 0, "penalties": 0, "tax": 3500, "total": 73500}}'::jsonb
 )
-on conflict (business_date) do update set status = 'completed', report = excluded.report;
+on conflict (property_id, business_date) do update set status = 'completed', report = excluded.report;
 select source, rooms_available, rooms_sold, round(room_revenue) as room_rev, round(total_revenue) as total
   from report_daily(current_date - 1, current_date - 1);
 \echo '    (the snapshot is used verbatim, not recomputed from the folio)'
@@ -1390,5 +1390,192 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000ab
 select set_config('request.jwt.claims', '', false);
 set role authenticated;
 select guest_link_account() = '00000000-0000-0000-0000-0000000000bb' as adopted_expect_t;
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+-- ── Module 14: one system, two hotels, kept apart ───────────────────────────
+
+\echo '=== MODULE 14: multi-property'
+reset role;
+select set_config('request.jwt.claims', '', false);
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+set role authenticated;
+
+\echo '--- the first administrator runs the group: EXPECT t'
+select all_properties as runs_group_expect_t from staff where id = '00000000-0000-0000-0000-000000000001';
+
+\echo '--- add a second hotel'
+select create_property('DL', 'Samci Dal View', 'Samci') is not null as created_expect_t;
+
+\echo '--- and the group''s tax template, not an empty one: EXPECT t'
+select tax_label = (select tax_label from group_settings) as tax_pushed_expect_t
+  from properties where code = 'DL';
+
+\echo '--- the first hotel already has a room 101: EXPECT 1'
+select count(*) as sr_has_101_expect_1 from rooms where room_number = '101';
+
+-- Move to the new hotel. From here on, only its own records are in view —
+-- that is the switcher doing its job, not a gap in the test.
+select set_active_property((select id from properties where code = 'DL'));
+
+\echo '--- the switch took: EXPECT t'
+select current_property() = (select id from properties where code = 'DL') as switched_expect_t;
+
+\echo '--- it inherited the group''s message templates: EXPECT t'
+select count(*) > 0 as templates_copied_expect_t from message_templates;
+
+\echo '--- and starts with no rooms of its own: EXPECT 0'
+select count(*) as dl_starts_empty_expect_0 from rooms;
+
+insert into room_types (slug, name, category, base_rate) values ('lake-room', 'Lake Room', 'deluxe', 5000);
+
+\echo '--- so the second hotel may have a room 101 as well: EXPECT 1'
+insert into rooms (room_number, room_type_id)
+values ('101', (select id from room_types where slug = 'lake-room'));
+select count(*) as dl_has_101_expect_1 from rooms where room_number = '101';
+
+\echo '--- and both now exist, side by side: EXPECT 2'
+reset role;
+select count(*) as room_101_at_both_expect_2 from rooms where room_number = '101';
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+set role authenticated;
+
+insert into bookings (id, room_type_id, check_in, check_out, status, contact_name, rooms_count, quoted_rate, total_amount)
+values ('00000000-0000-0000-0000-0000000000d0',
+        (select id from room_types where slug = 'lake-room'),
+        current_date + 40, current_date + 41, 'confirmed', 'Dal Guest', 1, 5000, 5000);
+
+\echo '--- the booking was filed at the second hotel, not the first: EXPECT t'
+select property_id = (select id from properties where code = 'DL') as filed_at_dl_expect_t
+  from bookings where id = '00000000-0000-0000-0000-0000000000d0';
+
+-- Post the charge while still working at the second hotel.
+insert into folio_entries (booking_id, kind, description, amount)
+values ('00000000-0000-0000-0000-0000000000d0', 'extra', 'Shikara ride', 1200);
+
+\echo '--- the charge was filed at the second hotel: EXPECT t'
+select f.property_id = (select id from properties where code = 'DL') as charge_filed_at_dl_expect_t
+  from folio_entries f where f.booking_id = '00000000-0000-0000-0000-0000000000d0';
+
+-- Now move to the FIRST hotel. Posting to the second hotel's booking from
+-- here must be refused outright rather than quietly filed somewhere.
+select set_active_property((select id from properties where code = 'SR'));
+
+\echo '--- EXPECT refusal: a charge on another hotel''s booking, from this hotel''s screen'
+insert into folio_entries (booking_id, kind, description, amount)
+values ('00000000-0000-0000-0000-0000000000d0', 'extra', 'Should not post', 500);
+
+\echo '--- so nothing was added: EXPECT 1'
+reset role;
+select count(*) as dl_charges_expect_1 from folio_entries
+ where booking_id = '00000000-0000-0000-0000-0000000000d0';
+
+-- The webhook and the nightly jobs run as the service role, which is not
+-- subject to row level security at all. There the inheritance trigger is the
+-- only thing keeping a charge with its booking, so it is checked on its own.
+insert into folio_entries (booking_id, kind, description, amount)
+values ('00000000-0000-0000-0000-0000000000d0', 'extra', 'Late checkout', 300);
+
+\echo '--- a service-role charge still follows the booking, not the default property: EXPECT t'
+select f.property_id = (select id from properties where code = 'DL') as trigger_followed_booking_expect_t
+  from folio_entries f where f.description = 'Late checkout';
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+set role authenticated;
+
+-- ── Staff who belong to one hotel ───────────────────────────────────────────
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000d1', 'dl-desk@x.test', '{"full_name":"Dal Desk"}'),
+  ('00000000-0000-0000-0000-0000000000d2', 'dl-gm@x.test',   '{"full_name":"Dal Manager"}');
+insert into staff (id, email, full_name, role, property_id) values
+  ('00000000-0000-0000-0000-0000000000d1', 'dl-desk@x.test', 'Dal Desk', 'front_desk',
+   (select id from properties where code = 'DL')),
+  ('00000000-0000-0000-0000-0000000000d2', 'dl-gm@x.test', 'Dal Manager', 'manager',
+   (select id from properties where code = 'DL'));
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d1', false);
+set role authenticated;
+
+\echo '--- the second hotel''s desk sees its own booking: EXPECT 1'
+select count(*) as dl_sees_own_expect_1 from bookings
+ where id = '00000000-0000-0000-0000-0000000000d0';
+
+\echo '--- and none of the first hotel''s guests: EXPECT 0'
+select count(*) as dl_sees_sr_guests_expect_0 from guests
+ where property_id = (select id from properties where code = 'SR');
+
+\echo '--- nor its rooms: EXPECT 1 (only its own 101)'
+select count(*) as dl_sees_rooms_expect_1 from rooms;
+
+\echo '--- it cannot borrow the first hotel''s property row either: EXPECT 0'
+select count(*) as dl_sees_sr_property_expect_0 from properties where code = 'SR';
+
+\echo '--- EXPECT PROPERTY_NOT_YOURS: the desk cannot move itself to another hotel'
+select set_active_property((select id from properties where code = 'SR'));
+
+-- ── The other direction ─────────────────────────────────────────────────────
+
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', false);
+set role authenticated;
+
+\echo '--- the first hotel''s desk cannot see the second hotel''s booking: EXPECT 0'
+select count(*) as sr_sees_dl_booking_expect_0 from bookings
+ where id = '00000000-0000-0000-0000-0000000000d0';
+
+\echo '--- nor its charge: EXPECT 0'
+select count(*) as sr_sees_dl_charge_expect_0 from folio_entries
+ where booking_id = '00000000-0000-0000-0000-0000000000d0';
+
+-- ── Comparing properties ────────────────────────────────────────────────────
+
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d2', false);
+set role authenticated;
+
+\echo '--- a general manager compares only their own hotel: EXPECT 1'
+select count(*) as gm_group_rows_expect_1 from group_dashboard(current_date, current_date + 60);
+
+\echo '--- and sees rooms free only at their own: EXPECT 1'
+select count(distinct property_id) as gm_availability_expect_1
+  from group_availability(current_date + 40, current_date + 41);
+
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+set role authenticated;
+
+\echo '--- the group owner compares both: EXPECT 2'
+select count(*) as owner_group_rows_expect_2 from group_dashboard(current_date, current_date + 60);
+
+\echo '--- head office pushes its tax template to every property: EXPECT 2'
+select push_central_config(array['tax']) as pushed_expect_2;
+
+\echo '--- per-property reports stay per-property: EXPECT 0 of the second hotel''s extra'
+select set_active_property((select id from properties where code = 'SR'));
+select coalesce(sum(other_revenue), 0) as sr_excludes_dl_expect_0
+  from report_daily(current_date + 40, current_date + 41);
+
+\echo '--- while the second hotel does count it: EXPECT 1200'
+select set_active_property((select id from properties where code = 'DL'));
+select coalesce(sum(other_revenue), 0)::int as dl_counts_it_expect_1500
+  from report_daily(current_date - 400, current_date + 400);
+
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+
+-- The public website sells one hotel, so it must not be shown the group's.
+
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+set role anon;
+
+\echo '--- the website lists only the property it sells: EXPECT 0 of the second hotel''s rooms'
+select count(*) as public_sees_dl_types_expect_0 from room_types where slug = 'lake-room';
+
+\echo '--- while still listing the property it does sell: EXPECT t'
+select count(*) > 0 as public_sees_sr_types_expect_t from room_types;
+
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);

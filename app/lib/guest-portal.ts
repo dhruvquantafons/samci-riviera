@@ -3,7 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, createServiceClient } from "./supabase/server";
-import { getGuestSession, sendGuestCode, verifyGuestCode, signOutGuest } from "./guest-auth";
+import {
+  getGuestSession,
+  sendGuestCode,
+  verifyGuestCode,
+  signOutGuest,
+  guestPasswordLoginEnabled,
+  signInGuestWithPassword,
+  signUpGuestWithPassword,
+  linkGuestProfile,
+} from "./guest-auth";
 import { getSettings } from "./settings";
 import { createPaymentLink, razorpayConfigured } from "./razorpay";
 import { normalisePhone } from "./integrations";
@@ -54,6 +63,51 @@ export async function confirmGuestCode(_prev: PortalState, fd: FormData): Promis
 
   const { error } = await verifyGuestCode(email, code);
   if (error) return { error: "That code is wrong or has expired. Ask for a new one." };
+
+  revalidatePath("/account");
+  redirect("/account");
+}
+
+/**
+ * The password alternative, for teams testing a staging deployment.
+ *
+ * One form does both jobs: an address we know signs in, one we do not gets an
+ * account. That is deliberate — asking "do you already have an account?" would
+ * answer, for anyone who cared to ask, whether a given person has stayed here.
+ * A wrong password on a known address still fails, so this never becomes a way
+ * into somebody else's account.
+ *
+ * An account opened this way always starts empty, whatever address is typed:
+ * guest_link_account() will not adopt an existing profile for a password
+ * session, because a password proves nothing about the address.
+ */
+export async function guestPasswordAuth(_prev: PortalState, fd: FormData): Promise<PortalState> {
+  if (!guestPasswordLoginEnabled()) {
+    return { error: "Please use the emailed sign-in code." };
+  }
+
+  const email = field(fd, "email").toLowerCase();
+  const password = field(fd, "password", 200);
+
+  if (!EMAIL.test(email)) return { error: "Please enter a valid email address." };
+  if (password.length < 8) return { error: "Your password needs at least 8 characters." };
+
+  const signIn = await signInGuestWithPassword(email, password);
+  if (signIn.error) {
+    const signUp = await signUpGuestWithPassword(email, password);
+    if (signUp.error) {
+      return { error: "That email address and password do not match an account we can open." };
+    }
+  }
+
+  const { unconfirmed, error } = await linkGuestProfile();
+  // Supabase can be configured to hold a new signup until the address is
+  // confirmed, in which case no session was issued and there is nothing to
+  // link yet. Switch "Confirm email" off to let a team test without inboxes.
+  if (unconfirmed) {
+    return { success: "Check your email to confirm your address, then sign in again." };
+  }
+  if (error) return { error };
 
   revalidatePath("/account");
   redirect("/account");

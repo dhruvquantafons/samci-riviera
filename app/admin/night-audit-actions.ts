@@ -6,6 +6,7 @@ import { createClient } from "../lib/supabase/server";
 import { requirePermission } from "../lib/auth";
 import { can } from "../lib/permissions";
 import { getSettings } from "../lib/settings";
+import { getCurrentProperty } from "../lib/properties";
 import { friendlyDbError } from "../lib/db-errors";
 import { noShowPenalty } from "../lib/policies";
 import { postRoomCharges } from "../lib/folio";
@@ -42,9 +43,16 @@ export async function runNightAudit(_prev: ActionState, fd: FormData): Promise<A
 
   if (!bool(fd, "confirm")) return { error: `Tick the box to confirm closing ${day}.` };
 
+  // Each property closes its own day, so every lookup here is keyed by both
+  // (the primary key became (property_id, business_date) in 0024). Without the
+  // property, a group owner with two hotels open would match two rows.
+  const property = await getCurrentProperty();
+  if (!property) return { error: "No property is selected." };
+
   const { data: existing } = await supabase
     .from("night_audits")
     .select("status")
+    .eq("property_id", property.id)
     .eq("business_date", day)
     .maybeSingle();
   if (existing?.status === "completed") {
@@ -52,13 +60,22 @@ export async function runNightAudit(_prev: ActionState, fd: FormData): Promise<A
   }
 
   const { error: startError } = await supabase.from("night_audits").upsert(
-    { business_date: day, status: "running", started_by: staffId, started_at: new Date().toISOString(), error: "" },
-    { onConflict: "business_date" },
+    {
+      property_id: property.id,
+      business_date: day,
+      status: "running",
+      started_by: staffId,
+      started_at: new Date().toISOString(),
+      error: "",
+    },
+    { onConflict: "property_id,business_date" },
   );
   if (startError) return { error: friendlyDbError(startError.message) };
 
   const fail = async (message: string) => {
-    await supabase.from("night_audits").update({ status: "failed", error: message }).eq("business_date", day);
+    await supabase.from("night_audits").update({ status: "failed", error: message })
+      .eq("property_id", property.id)
+      .eq("business_date", day);
     return { error: `Night audit stopped: ${friendlyDbError(message)} Fix the problem and run it again.` };
   };
 
@@ -332,6 +349,7 @@ export async function runNightAudit(_prev: ActionState, fd: FormData): Promise<A
   const { error: doneError } = await supabase
     .from("night_audits")
     .update({ status: "completed", completed_at: new Date().toISOString(), report, error: "" })
+    .eq("property_id", property.id)
     .eq("business_date", day);
   if (doneError) return fail(doneError.message);
 

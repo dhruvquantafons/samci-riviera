@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createPublicClient } from "../../lib/supabase/server";
-import { getGuestSession } from "../../lib/guest-auth";
+import { getGuestSession, guestPasswordLoginEnabled } from "../../lib/guest-auth";
 import { loadGuestBookings, endGuestSession } from "../../lib/guest-portal";
 import { getPortalSettings } from "../../lib/rates";
 import { stringsFor, isRtl, type DisplayCurrency } from "../../lib/portal-i18n";
@@ -77,7 +77,10 @@ export default async function AccountPage({
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {!session ? (
             <div className="max-w-md mx-auto bg-white/[0.04] border border-white/10 rounded-lg p-6 sm:p-8">
-              <GuestSignIn labels={{ emailCode: t.emailCode, enterCode: t.enterCode }} />
+              <GuestSignIn
+                labels={{ emailCode: t.emailCode, enterCode: t.enterCode }}
+                passwordLogin={guestPasswordLoginEnabled()}
+              />
             </div>
           ) : (
             <div className="space-y-10">

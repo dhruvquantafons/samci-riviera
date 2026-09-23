@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "../lib/supabase/server";
 import { requirePermission } from "../lib/auth";
 import { getSettings } from "../lib/settings";
+import { getCurrentProperty } from "../lib/properties";
 import { friendlyDbError } from "../lib/db-errors";
 import { passwordProblems, describePasswordProblems } from "../lib/password-policy";
 import { isPermission } from "../lib/permissions";
@@ -61,6 +62,15 @@ export async function createStaffMember(_prev: ActionState, fd: FormData): Promi
     return { error: alreadyExists ? `An account already exists for ${email}.` : createError.message };
   }
 
+  // Which hotel this person works at (Module 14). Written explicitly because
+  // this insert goes through the service role, whose current_property() is the
+  // website's property rather than whichever one the administrator is working
+  // in — so relying on the column default would quietly file new colleagues at
+  // the wrong hotel.
+  const property = await getCurrentProperty();
+  const chosen = str(fd, "property_id", 36);
+  const propertyId = /^[0-9a-f-]{36}$/i.test(chosen) ? chosen : (property?.id ?? null);
+
   // The staff row is written here rather than by a sign-up trigger. Since
   // 0021 that trigger only bootstraps the very first account, because the
   // booking portal now lets the public create logins and none of them may
@@ -75,6 +85,8 @@ export async function createStaffMember(_prev: ActionState, fd: FormData): Promi
       role,
       is_active: true,
       must_change_password: true,
+      ...(propertyId ? { property_id: propertyId } : {}),
+      all_properties: str(fd, "all_properties") === "true",
     },
     { onConflict: "id" },
   );
@@ -173,6 +185,13 @@ export async function updateStaffMember(_prev: ActionState, fd: FormData): Promi
     if (!(await roleExists(role))) return { error: "Choose a role." };
     details.role = role;
     details.is_active = str(fd, "is_active") === "true";
+
+    // Where they work (Module 14). Only offered for other people, for the same
+    // reason as role and active: an administrator who moved themselves to
+    // another hotel and cleared their group access could not get back.
+    const property = str(fd, "property_id", 36);
+    if (/^[0-9a-f-]{36}$/i.test(property)) details.property_id = property;
+    details.all_properties = str(fd, "all_properties") === "true";
   }
 
   const { error } = await supabase.from("staff").update(details).eq("id", id);
@@ -301,6 +320,12 @@ export async function saveSettings(_prev: ActionState, fd: FormData): Promise<Ac
     ...new Set([defaultLanguage, ...fd.getAll("languages").map(String).filter((l) => l in LANGUAGES)]),
   ];
 
+  // Since 0024 property_settings is a view onto the one property this request
+  // is about, and its id is that property's uuid rather than the old
+  // singleton `true`. Reading it back keeps the update aimed at one row.
+  const { data: current } = await supabase.from("property_settings").select("id").maybeSingle();
+  if (!current) return { error: "Property settings are not set up yet." };
+
   const { error } = await supabase
     .from("property_settings")
     .update({
@@ -362,7 +387,7 @@ export async function saveSettings(_prev: ActionState, fd: FormData): Promise<Ac
       revenue_floor_rate: Math.max(0, num(fd, "revenue_floor_rate") ?? 0),
       revenue_ceiling_rate: Math.max(0, num(fd, "revenue_ceiling_rate") ?? 0),
     })
-    .eq("id", true);
+    .eq("id", current.id);
   if (error) return { error: friendlyDbError(error.message) };
 
   revalidatePath("/admin", "layout");
