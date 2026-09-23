@@ -116,7 +116,15 @@ export const PERMISSION_GROUPS = [
     module: "Rates",
     permissions: [
       { key: "rates.view", label: "View rates and plans" },
-      { key: "rates.manage", label: "Change rates, plans, seasons and restrictions" },
+      { key: "rates.manage", label: "Change rates, plans, seasons, restrictions and packages" },
+    ],
+  },
+  {
+    module: "Revenue",
+    permissions: [
+      { key: "revenue.view", label: "View the forecast, pricing rules and competitor rates" },
+      { key: "revenue.manage", label: "Set pricing rules, promo codes and competitor rates" },
+      { key: "revenue.approve", label: "Approve rate changes above the automatic threshold" },
     ],
   },
   {

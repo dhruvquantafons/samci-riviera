@@ -176,7 +176,8 @@ export interface RatePlan {
   rate_type: RateType;
   description: string;
   meal_plan: MealPlan;
-  adjustment_kind: "percent" | "amount";
+  /** 'fixed' sells the plan at adjustment_value outright, for packages. */
+  adjustment_kind: AdjustmentKind;
   adjustment_value: number;
   room_type_ids: string[];
   company_id: string | null;
@@ -321,7 +322,45 @@ export const LANGUAGES: Record<string, string> = {
   ja: "Japanese",
 };
 
-export type MessageTemplateKey = "request_received" | "confirmation" | "cancellation" | "final_bill";
+export type MessageTemplateKey =
+  | "request_received"
+  | "confirmation"
+  | "cancellation"
+  | "final_bill"
+  // SOW Module 16: the pre-arrival reminder, the check-in instructions and
+  // the post-stay thank-you. Sent on a timer by the nightly job.
+  | "pre_arrival"
+  | "checkin_instructions"
+  | "post_stay"
+  // Trigger events: "payment received" and "booking modified".
+  | "payment_receipt"
+  | "booking_modified";
+
+/** Messages the nightly job sends, keyed off a date rather than an action. */
+export const TIMED_TEMPLATES = ["pre_arrival", "checkin_instructions", "post_stay"] as const;
+export type TimedTemplate = (typeof TIMED_TEMPLATES)[number];
+
+export type NotificationKind = "guest" | "staff";
+
+export interface Notification {
+  id: string;
+  booking_id: string | null;
+  guest_id: string | null;
+  staff_id: string | null;
+  kind: NotificationKind;
+  channel: "email" | "sms";
+  template: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: "sent" | "skipped" | "failed";
+  provider_id: string;
+  error: string;
+  created_by: string | null;
+  created_at: string;
+  bookings?: { id: string; reference: string } | null;
+  staff?: { id: string; full_name: string } | null;
+}
 
 export interface MessageTemplate {
   template: MessageTemplateKey;
@@ -357,7 +396,11 @@ export interface Booking {
   status: BookingStatus;
   source: BookingSource;
   payment_method: PaymentMethod | null;
+  /** The code as the guest typed it, kept even when it was not honoured. */
   promo_code: string;
+  /** The code actually applied, and what it took off (Module 4). */
+  promo_code_id: string | null;
+  promo_discount: number;
   quoted_rate: number | null;
   total_amount: number | null;
   rate_breakdown: NightRate[];
@@ -623,6 +666,19 @@ export interface PropertySettings {
   event_advance_percent: number;
   event_terms: string;
   monthly_operating_cost: number;
+  /** Best-rate guarantee wording on the booking portal (Module 17). */
+  best_rate_message: string;
+  /** Notification timings and staff alerts (Module 16). 0 days = off. */
+  notify_pre_arrival_days: number;
+  notify_checkin_days: number;
+  notify_post_stay_days: number;
+  notify_staff_new_booking: boolean;
+  notify_staff_vip_arrival: boolean;
+  notify_staff_ticket_assigned: boolean;
+  revenue_auto_approve_percent: number;
+  revenue_forecast_days: number;
+  revenue_floor_rate: number;
+  revenue_ceiling_rate: number;
   updated_at: string;
 }
 
@@ -1598,4 +1654,154 @@ export interface EventPayment {
   voided_at: string | null;
   void_reason: string;
   created_at: string;
+}
+
+// ── Module 4: Revenue & dynamic pricing ─────────────────────────────────────
+
+export type AdjustmentKind = "percent" | "amount" | "fixed";
+export type PricingAdjustmentStatus = "pending" | "applied" | "rejected" | "expired";
+export type PackageBasis = "per_stay" | "per_night" | "per_person_per_stay" | "per_person_per_night";
+export type DiscountKind = "percent" | "amount";
+
+export const PACKAGE_BASIS_LABELS: Record<PackageBasis, string> = {
+  per_stay: "Once per stay",
+  per_night: "Each night",
+  per_person_per_stay: "Per person, once",
+  per_person_per_night: "Per person, each night",
+};
+
+export const PRICING_ADJUSTMENT_STATUS_LABELS: Record<PricingAdjustmentStatus, string> = {
+  pending: "Waiting for approval",
+  applied: "Live",
+  rejected: "Rejected",
+  expired: "Expired",
+};
+
+export interface PackageComponent {
+  id: string;
+  rate_plan_id: string;
+  name: string;
+  description: string;
+  retail_value: number;
+  basis: PackageBasis;
+  quantity: number;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface PricingRule {
+  id: string;
+  name: string;
+  description: string;
+  room_type_id: string | null;
+  min_occupancy: number | null;
+  max_occupancy: number | null;
+  days_of_week: number[];
+  start_date: string | null;
+  end_date: string | null;
+  occasion: string;
+  min_lead_days: number | null;
+  max_lead_days: number | null;
+  adjustment_kind: AdjustmentKind;
+  adjustment_value: number;
+  floor_rate: number;
+  ceiling_rate: number;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PricingAdjustment {
+  id: string;
+  stay_date: string;
+  room_type_id: string;
+  rule_id: string | null;
+  rule_name: string;
+  occasion: string;
+  base_rate: number;
+  proposed_rate: number;
+  change_percent: number;
+  occupancy_percent: number | null;
+  rooms_sold: number | null;
+  capacity: number | null;
+  status: PricingAdjustmentStatus;
+  threshold_percent: number;
+  note: string;
+  created_at: string;
+  created_by: string | null;
+  decided_at: string | null;
+  decided_by: string | null;
+  room_types?: Pick<RoomType, "id" | "name"> | null;
+}
+
+export interface CompetitorProperty {
+  id: string;
+  name: string;
+  source: string;
+  notes: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface CompetitorRate {
+  id: string;
+  competitor_id: string;
+  stay_date: string;
+  room_type_id: string | null;
+  rate: number;
+  meal_plan: MealPlan;
+  tax_inclusive: boolean;
+  sold_out: boolean;
+  note: string;
+  observed_at: string;
+  observed_by: string | null;
+  competitor_properties?: Pick<CompetitorProperty, "id" | "name"> | null;
+}
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  discount_kind: DiscountKind;
+  discount_value: number;
+  max_discount: number;
+  room_type_ids: string[];
+  rate_plan_ids: string[];
+  valid_from: string | null;
+  valid_to: string | null;
+  stay_from: string | null;
+  stay_to: string | null;
+  min_nights: number | null;
+  min_amount: number;
+  max_redemptions: number | null;
+  max_per_guest: number | null;
+  redemption_count: number;
+  is_public: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export interface PromoRedemption {
+  id: string;
+  promo_code_id: string;
+  booking_id: string;
+  guest_id: string | null;
+  email: string;
+  discount_amount: number;
+  redeemed_at: string;
+}
+
+/** One night of the forecast, for one room type. */
+export interface ForecastRow {
+  stay_date: string;
+  room_type_id: string;
+  capacity: number;
+  rooms_sold: number;
+  revenue_on_books: number;
 }

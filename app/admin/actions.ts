@@ -61,19 +61,29 @@ export async function createStaffMember(_prev: ActionState, fd: FormData): Promi
     return { error: alreadyExists ? `An account already exists for ${email}.` : createError.message };
   }
 
-  // A database trigger creates the matching staff row; fill in the rest.
-  const { error: detailsError } = await admin
-    .from("staff")
-    .update({
+  // The staff row is written here rather than by a sign-up trigger. Since
+  // 0021 that trigger only bootstraps the very first account, because the
+  // booking portal now lets the public create logins and none of them may
+  // become staff. Upserted because the bootstrap may have created this row.
+  const { error: detailsError } = await admin.from("staff").upsert(
+    {
+      id: created.user.id,
+      email,
       full_name: fullName,
       job_title: str(fd, "job_title", 120),
       phone: str(fd, "phone", 50),
       role,
       is_active: true,
       must_change_password: true,
-    })
-    .eq("id", created.user.id);
-  if (detailsError) return { error: detailsError.message };
+    },
+    { onConflict: "id" },
+  );
+  if (detailsError) {
+    // Without a staff row the login can do nothing and nobody can tidy it up
+    // from the panel, so take the half-made account away again.
+    await admin.auth.admin.deleteUser(created.user.id);
+    return { error: detailsError.message };
+  }
 
   revalidatePath("/admin/staff");
   return { success: `${fullName} can now sign in with ${email}, and will be asked to choose a new password.` };
@@ -340,6 +350,17 @@ export async function saveSettings(_prev: ActionState, fd: FormData): Promise<Ac
       event_advance_percent: Math.min(100, Math.max(0, num(fd, "event_advance_percent") ?? 25)),
       event_terms: str(fd, "event_terms", 4000),
       monthly_operating_cost: Math.max(0, num(fd, "monthly_operating_cost") ?? 0),
+      best_rate_message: str(fd, "best_rate_message", 500),
+      notify_pre_arrival_days: int(fd, "notify_pre_arrival_days", 3, 0, 30),
+      notify_checkin_days: int(fd, "notify_checkin_days", 1, 0, 30),
+      notify_post_stay_days: int(fd, "notify_post_stay_days", 1, 0, 30),
+      notify_staff_new_booking: bool(fd, "notify_staff_new_booking"),
+      notify_staff_vip_arrival: bool(fd, "notify_staff_vip_arrival"),
+      notify_staff_ticket_assigned: bool(fd, "notify_staff_ticket_assigned"),
+      revenue_auto_approve_percent: Math.min(100, Math.max(0, num(fd, "revenue_auto_approve_percent") ?? 10)),
+      revenue_forecast_days: int(fd, "revenue_forecast_days", 60, 7, 365),
+      revenue_floor_rate: Math.max(0, num(fd, "revenue_floor_rate") ?? 0),
+      revenue_ceiling_rate: Math.max(0, num(fd, "revenue_ceiling_rate") ?? 0),
     })
     .eq("id", true);
   if (error) return { error: friendlyDbError(error.message) };

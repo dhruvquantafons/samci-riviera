@@ -66,6 +66,7 @@ export async function createGroup(_prev: ActionState, fd: FormData): Promise<Act
       seasons: pricing.seasons,
       restrictions: pricing.restrictions,
       extraCharges: pricing.extraCharges,
+      adjustments: pricing.adjustments,
     });
     problems.push(...quote.violations);
 
@@ -176,6 +177,7 @@ export async function addRoomsToGroup(_prev: ActionState, fd: FormData): Promise
     seasons: pricing.seasons,
     restrictions: pricing.restrictions,
     extraCharges: pricing.extraCharges,
+    adjustments: pricing.adjustments,
   });
 
   const { count: existing } = await supabase

@@ -8,10 +8,17 @@
  * A night's rate, per room, is built up in order:
  *   1. the room type's base rate, or its weekend rate on Friday/Saturday nights
  *   2. the highest-priority season covering that night, if any
- *   3. the rate plan's adjustment (e.g. -10% corporate)
- *   4. the plan's length-of-stay discount, when the stay is long enough
+ *   3. a live dynamic-pricing adjustment for that night, which replaces 1–2
+ *      outright, because a revenue rule sets the selling rate rather than
+ *      nudging it (Module 4; the rule worked from the same 1–2 figure)
+ *   4. the rate plan's adjustment (e.g. -10% corporate)
+ *   5. the plan's length-of-stay discount, when the stay is long enough
  * plus the extra-adult charge for each adult above the room type's base
  * occupancy.
+ *
+ * A promo code is not part of this build-up. It comes off the finished total,
+ * so that "10% off" means 10% off what the guest was about to pay; see
+ * checkPromo in revenue.ts.
  */
 import type {
   ExtraCharge,
@@ -45,6 +52,19 @@ export type PricingPlan = Pick<
   | "deposit_percent"
 >;
 
+/**
+ * A rate a revenue rule has set for one night of one room type.
+ *
+ * Declared here rather than imported from revenue.ts, which imports this
+ * module for the season and weekend logic it prices against.
+ */
+export interface LiveAdjustment {
+  stay_date: string;
+  room_type_id: string;
+  proposed_rate: number;
+  status: string;
+}
+
 export interface QuoteInput {
   roomType: PricingRoomType;
   plan: PricingPlan | null;
@@ -56,6 +76,8 @@ export interface QuoteInput {
   seasons: RateSeason[];
   restrictions: RateRestriction[];
   extraCharges: Pick<ExtraCharge, "kind" | "amount" | "is_active">[];
+  /** Live dynamic-pricing decisions. Absent is the same as none. */
+  adjustments?: LiveAdjustment[];
 }
 
 export interface Quote {
@@ -114,9 +136,29 @@ function applySeason(rate: number, season: RateSeason | null) {
   return rate * (1 + v / 100);
 }
 
+/**
+ * The rate a live revenue rule has set for a night, or null.
+ *
+ * Only 'applied' rows sell. A proposal still waiting for a manager must not
+ * reach a guest, which is the whole point of the approval threshold.
+ */
+export function liveAdjustmentFor(
+  adjustments: LiveAdjustment[] | undefined,
+  date: string,
+  roomTypeId: string,
+): number | null {
+  const hit = adjustments?.find(
+    (a) => a.status === "applied" && a.stay_date === date && a.room_type_id === roomTypeId,
+  );
+  return hit ? Number(hit.proposed_rate) : null;
+}
+
 function applyPlan(rate: number, plan: PricingPlan | null) {
   if (!plan) return rate;
   const v = Number(plan.adjustment_value);
+  // A package is sold at one price, so 'fixed' sets the night's rate outright
+  // rather than moving the room rate (Module 4).
+  if (plan.adjustment_kind === "fixed") return v;
   return plan.adjustment_kind === "amount" ? rate + v : rate * (1 + v / 100);
 }
 
@@ -216,7 +258,10 @@ export function quoteStay(input: QuoteInput): Quote {
       isWeekendNight(date) && roomType.weekend_rate !== null
         ? Number(roomType.weekend_rate)
         : Number(roomType.base_rate);
-    let rate = applySeason(base, seasonFor(date, roomType.id, seasons));
+    // A live revenue rule replaces the base-and-season figure it was built
+    // from, rather than compounding with it.
+    const dynamic = liveAdjustmentFor(input.adjustments, date, roomType.id);
+    let rate = dynamic ?? applySeason(base, seasonFor(date, roomType.id, seasons));
     rate = applyPlan(rate, plan);
     rate = rate * (1 - losDiscount / 100);
     rate += extraAdults * Number(extraAdultCharge);

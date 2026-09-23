@@ -9,7 +9,7 @@ import { can } from "../lib/permissions";
 import { getSettings } from "../lib/settings";
 import { friendlyDbError } from "../lib/db-errors";
 import { todayIn } from "../lib/dates";
-import { alertSupervisors } from "../lib/staff-alerts";
+import { alertSupervisors, alertTicketAssigned, type TicketForAlert } from "../lib/staff-alerts";
 import { MT_PRIORITIES, type MaintenanceTicket, type AssetCategory, ASSET_CATEGORY_LABELS } from "../lib/types";
 import { type ActionState, str, int, bool, oneOf, dateStr, uuidOrNull } from "./form-utils";
 
@@ -260,15 +260,31 @@ export async function cancelTicket(_prev: ActionState, fd: FormData): Promise<Ac
 }
 
 export async function assignTicket(fd: FormData) {
-  await requirePermission("maintenance.manage");
+  const session = await requirePermission("maintenance.manage");
   const supabase = await createClient();
   const id = uuidOrNull(fd, "id");
   if (!id) return;
   const staffId = uuidOrNull(fd, "assigned_to");
-  await supabase
+
+  const { data: ticket } = await supabase
     .from("maintenance_tickets")
     .update({ assigned_to: staffId, assigned_at: staffId ? new Date().toISOString() : null })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id, reference, title, priority, due_at, location, assigned_to, rooms(room_number)")
+    .maybeSingle();
+
+  // SOW Module 16, trigger event "ticket assigned": the person who now owns
+  // the job hears about it. Unassigning tells nobody.
+  const settings = await getSettings();
+  if (ticket && staffId && settings.notify_staff_ticket_assigned) {
+    await alertTicketAssigned(
+      supabase,
+      ticket as unknown as TicketForAlert,
+      staffId,
+      session.staff.id,
+    );
+  }
+
   revalidateMt(id);
 }
 

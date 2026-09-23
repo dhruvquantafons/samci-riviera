@@ -17,6 +17,8 @@ import {
   Contact,
   Clock,
   IndianRupee,
+  TrendingUp,
+  BellRing,
   ReceiptIndianRupee,
   Building2,
   MoonStar,
@@ -92,12 +94,24 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/rates", label: "Rates", icon: IndianRupee, any: ["rates.view", "rates.manage"] },
       {
+        href: "/admin/revenue",
+        label: "Revenue",
+        icon: TrendingUp,
+        any: ["revenue.view", "revenue.manage", "revenue.approve"],
+      },
+      {
         href: "/admin/billing/invoices",
         label: "Billing",
         icon: ReceiptIndianRupee,
         any: ["folio.invoice", "folio.refund_approve", "folio.city_ledger"],
       },
       { href: "/admin/companies", label: "Companies", icon: Building2, any: ["companies.manage"] },
+      {
+        href: "/admin/notifications",
+        label: "Notifications",
+        icon: BellRing,
+        any: ["guests.view", "settings.manage", "audit.view"],
+      },
       {
         href: "/admin/reports",
         label: "Reports",
