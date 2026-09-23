@@ -74,8 +74,13 @@ export async function alertSupervisors(
 }
 
 /** Marks overdue tickets as escalated (once each) and alerts the supervisors. */
-export async function escalateOverdueTickets(db: SupabaseClient, staffId: string | null = null) {
-  const { data, error } = await db.rpc("mt_escalate_overdue");
+export async function escalateOverdueTickets(
+  db: SupabaseClient,
+  staffId: string | null = null,
+  /** Which hotel. Omit to mean the caller's own (SOW Module 14). */
+  propertyId: string | null = null,
+) {
+  const { data, error } = await db.rpc("mt_escalate_overdue", { p_property: propertyId });
   if (error || !data?.length) return 0;
   const tickets = data as (TicketForAlert & { room_id: string | null })[];
   const roomIds = tickets.map((t) => t.room_id).filter(Boolean) as string[];

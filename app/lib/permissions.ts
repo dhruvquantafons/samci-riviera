@@ -136,6 +136,13 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    module: "Properties",
+    permissions: [
+      { key: "properties.view", label: "Compare properties across the group" },
+      { key: "properties.manage", label: "Add properties and push group standards" },
+    ],
+  },
+  {
     module: "Administration",
     permissions: [
       { key: "staff.manage", label: "Manage staff accounts" },

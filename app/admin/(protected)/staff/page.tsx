@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requirePermission } from "../../../lib/auth";
 import type { Role, Staff } from "../../../lib/types";
 import { PageHeader, Card, EmptyState, fmtDateTime } from "../../components/ui";
+import { getProperties, getCurrentProperty } from "../../../lib/properties";
 import StaffMemberForm from "./StaffMemberForm";
 import AddStaffForm from "./AddStaffForm";
 import StaffAccountActions from "./StaffAccountActions";
@@ -20,6 +21,11 @@ export default async function StaffPage() {
 
   const members = (data ?? []) as Staff[];
   const roles = (roleRows ?? []) as Role[];
+
+  // Only the hotels this administrator may work at, so assigning somebody to a
+  // property is held to the same boundary as everything else (Module 14).
+  const [properties, current] = await Promise.all([getProperties(), getCurrentProperty()]);
+  const propertyOptions = properties.map((p) => ({ id: p.id, code: p.code, name: p.name }));
   const incomplete = members.filter((m) => !m.full_name.trim()).length;
 
   return (
@@ -53,7 +59,7 @@ export default async function StaffPage() {
       </div>
 
       <Card className="p-5 mb-6">
-        <AddStaffForm roles={roles} />
+        <AddStaffForm roles={roles} properties={propertyOptions} currentProperty={current?.id ?? null} />
       </Card>
 
       {incomplete > 0 && (
@@ -70,7 +76,12 @@ export default async function StaffPage() {
         <div className="space-y-5">
           {members.map((member) => (
             <Card key={member.id} className="p-5 space-y-4">
-              <StaffMemberForm member={member} isSelf={member.id === me.id} roles={roles} />
+              <StaffMemberForm
+                member={member}
+                isSelf={member.id === me.id}
+                roles={roles}
+                properties={propertyOptions}
+              />
 
               <div className="pt-4 border-t border-slate-100 space-y-3">
                 {member.id !== me.id && <StaffAccountActions member={member} />}

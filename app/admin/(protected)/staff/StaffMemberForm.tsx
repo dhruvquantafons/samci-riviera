@@ -3,19 +3,22 @@
 import { keepFormOnSubmit } from "../../components/useKeepForm";
 
 import { useActionState } from "react";
-import type { Role, Staff } from "../../../lib/types";
+import type { Property, Role, Staff } from "../../../lib/types";
 import { updateStaffMember } from "../../actions";
 import type { ActionState } from "../../form-utils";
-import { Field, inputClass, buttonClass, Banner } from "../../components/ui";
+import { Field, inputClass, buttonClass, Banner, Check } from "../../components/ui";
 
 export default function StaffMemberForm({
   member,
   isSelf,
   roles,
+  properties = [],
 }: {
   member: Staff;
   isSelf: boolean;
   roles: Role[];
+  /** The hotels this person can be assigned to (SOW Module 14). */
+  properties?: Pick<Property, "id" | "code" | "name">[];
 }) {
   const role = roles.find((r) => r.key === member.role);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
@@ -101,6 +104,33 @@ export default function StaffMemberForm({
               <option value="false">Suspended</option>
             </select>
           </Field>
+
+          {properties.length > 1 && (
+            <>
+              <Field label="Works at" hint="Everything they see and report on is this hotel.">
+                <select
+                  name="property_id"
+                  defaultValue={member.property_id ?? ""}
+                  className={inputClass}
+                >
+                  {properties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.code} · {p.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="self-end pb-2">
+                <Check
+                  name="all_properties"
+                  value="true"
+                  label="Head office"
+                  defaultChecked={member.all_properties ?? false}
+                  hint="Sees and switches between every hotel in the group."
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 

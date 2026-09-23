@@ -35,6 +35,7 @@ import {
 import type { Staff } from "../../lib/types";
 import type { Permission } from "../../lib/permissions";
 import { signOut } from "../actions";
+import PropertySwitcher from "./PropertySwitcher";
 
 type NavItem = {
   href: string;
@@ -123,6 +124,12 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
   {
     heading: "Administration",
     items: [
+      {
+        href: "/admin/properties",
+        label: "Properties",
+        icon: Building2,
+        any: ["properties.view", "properties.manage"],
+      },
       { href: "/admin/staff", label: "Staff", icon: UserCog, any: ["staff.manage"] },
       { href: "/admin/roles", label: "Roles", icon: ShieldCheck, any: ["roles.manage"] },
       { href: "/admin/settings", label: "Settings", icon: Settings, any: ["settings.manage"] },
@@ -135,10 +142,15 @@ export default function Sidebar({
   staff,
   roleName,
   access,
+  properties = [],
+  currentProperty = null,
 }: {
   staff: Staff;
   roleName: string;
   access: { isSuperuser: boolean; permissions: string[] };
+  /** The hotels this person may work at (SOW Module 14). */
+  properties?: { id: string; code: string; name: string }[];
+  currentProperty?: string | null;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -237,6 +249,7 @@ export default function Sidebar({
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              <PropertySwitcher properties={properties} current={currentProperty} />
               {nav}
             </div>
             {footer}
@@ -246,7 +259,10 @@ export default function Sidebar({
 
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 bg-white border-r border-slate-200 p-3 flex-col justify-between overflow-y-auto print:hidden">
         <div className="space-y-6">
-          {brand}
+          <div className="space-y-2">
+            {brand}
+            <PropertySwitcher properties={properties} current={currentProperty} />
+          </div>
           {nav}
         </div>
         {footer}

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "../lib/supabase/server";
 import { requirePermission } from "../lib/auth";
+import { getCurrentProperty } from "../lib/properties";
 import { friendlyDbError } from "../lib/db-errors";
 import { LANGUAGES, type MessageTemplateKey } from "../lib/types";
 import { TEMPLATE_LABELS, unknownPlaceholders } from "../lib/message-templates";
@@ -34,7 +35,15 @@ export async function saveTemplate(_prev: ActionState, fd: FormData): Promise<Ac
     return { error: `Unknown placeholder${unknown.length > 1 ? "s" : ""}: ${unknown.map((u) => `{${u}}`).join(", ")}. Use the ones listed.` };
   }
 
-  const { error } = await supabase.from("message_templates").upsert(row, { onConflict: "template,language" });
+  // Templates are per property since 0024 ("Customizable message templates per
+  // property and per language"), so the conflict target carries the property.
+  const property = await getCurrentProperty();
+  const { error } = await supabase
+    .from("message_templates")
+    .upsert(
+      { ...row, ...(property ? { property_id: property.id } : {}) },
+      { onConflict: "property_id,template,language" },
+    );
   if (error) return { error: friendlyDbError(error.message) };
   revalidatePath("/admin/settings/templates");
   return { success: `${TEMPLATE_LABELS[template].name} (${LANGUAGES[language]}) saved.` };

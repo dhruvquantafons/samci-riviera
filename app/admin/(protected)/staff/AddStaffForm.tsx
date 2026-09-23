@@ -4,10 +4,10 @@ import { keepFormOnSubmit } from "../../components/useKeepForm";
 
 import { useActionState, useState } from "react";
 import { UserPlus, RefreshCw, CheckCircle2 } from "lucide-react";
-import type { Role, StaffRole } from "../../../lib/types";
+import type { Property, Role, StaffRole } from "../../../lib/types";
 import { createStaffMember } from "../../actions";
 import type { ActionState } from "../../form-utils";
-import { Field, inputClass, buttonClass, Banner } from "../../components/ui";
+import { Field, inputClass, buttonClass, Banner, Check } from "../../components/ui";
 
 /**
  * Readable starting password that satisfies the complexity policy: it always
@@ -27,7 +27,16 @@ function suggestPassword() {
   return chars.map((c, i) => [order[i], c] as const).sort((a, b) => a[0] - b[0]).map(([, c]) => c).join("");
 }
 
-export default function AddStaffForm({ roles }: { roles: Role[] }) {
+export default function AddStaffForm({
+  roles,
+  properties = [],
+  currentProperty = null,
+}: {
+  roles: Role[];
+  /** The hotels the administrator may assign to (SOW Module 14). */
+  properties?: Pick<Property, "id" | "code" | "name">[];
+  currentProperty?: string | null;
+}) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     createStaffMember,
     {},
@@ -124,6 +133,26 @@ export default function AddStaffForm({ roles }: { roles: Role[] }) {
             ))}
           </select>
         </Field>
+
+        {properties.length > 1 && (
+          <>
+            <Field label="Works at" hint="Which hotel this person's screens and reports are about.">
+              <select name="property_id" defaultValue={currentProperty ?? ""} className={inputClass}>
+                {properties.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code} · {p.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Check
+              name="all_properties"
+              value="true"
+              label="Head office — sees every hotel in the group"
+              hint="For owners and group roles. Everyone else is held to the hotel above."
+            />
+          </>
+        )}
 
         <Banner error={state.error} />
 
