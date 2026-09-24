@@ -6,11 +6,12 @@ import { can } from "../../lib/permissions";
 import { getSettings } from "../../lib/settings";
 import type { Booking, Room } from "../../lib/types";
 import { OCCUPYING_STATUSES, roomBoardLabel } from "../../lib/types";
-import { todayIn, minutesSince } from "../../lib/dates";
+import { todayIn, minutesSince, addDays } from "../../lib/dates";
 import { kpisFrom, reportByKind, resolveRange, type DailyRow } from "../../lib/reports";
 import { runReport } from "../../lib/report-data";
 import LiveRefresh from "../components/LiveRefresh";
 import { PageHeader, Card, StatCard, StatusPill, fmtDate, fmtMoney } from "../components/ui";
+import TapeChart from "../components/TapeChart";
 
 const BOARD_TONE: Record<string, string> = {
   "Vacant Clean": "bg-emerald-500",
@@ -20,10 +21,6 @@ const BOARD_TONE: Record<string, string> = {
   "Out of Service": "bg-slate-400",
 };
 
-/**
- * Today at a glance: movements, occupancy, room status and anything that
- * needs attention. Reports and revenue belong to Module 13.
- */
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const session = await requireSession();
   const { denied } = await searchParams;
@@ -32,9 +29,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const today = todayIn(settings.timezone);
   const seesBookings = can(session, "bookings.view") || can(session, "frontdesk.view");
   const seesRevenue = can(session, "reports.financial");
+  const canCreate = can(session, "bookings.create");
 
-  // Today's trading, for the KPI row (SOW Module 13: "Real-time dashboard:
-  // occupancy %, ADR, RevPAR"). Only for roles allowed financial reports.
+  const tapeStart = addDays(today, -1);
+  const tapeDays = 14;
+  const tapeEnd = addDays(tapeStart, tapeDays);
+
   const todayKpis = seesRevenue
     ? kpisFrom(
         ((await runReport(supabase, reportByKind("daily_revenue")!, resolveRange("today", today))).rows ??
@@ -43,48 +43,73 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       )
     : null;
 
-  const [tentative, waitlisted, arrivals, departures, inHouse, occupied, rooms, unassigned, openRequests, hkOpen, mtOpen, leavePending] =
-    await Promise.all([
-      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "tentative"),
-      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "waitlisted"),
-      supabase
-        .from("bookings")
-        .select("*, guests(id, full_name), rooms(id, room_number)")
-        .eq("check_in", today)
-        .in("status", ["tentative", "confirmed"])
-        .order("created_at"),
-      supabase
-        .from("bookings")
-        .select("*, guests(id, full_name), rooms(id, room_number)")
-        .eq("check_out", today)
-        .eq("status", "checked_in")
-        .order("created_at"),
-      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "checked_in"),
-      supabase
-        .from("bookings")
-        .select("rooms_count")
-        .lte("check_in", today)
-        .gt("check_out", today)
-        .in("status", OCCUPYING_STATUSES),
-      supabase.from("rooms").select("id, status, housekeeping_status"),
-      supabase
-        .from("bookings")
-        .select("id", { count: "exact", head: true })
-        .is("room_id", null)
-        .lte("check_in", today)
-        .in("status", ["confirmed", "checked_in"]),
-      supabase.from("guest_requests").select("id", { count: "exact", head: true }).eq("status", "open"),
-      supabase
-        .from("housekeeping_tasks")
-        .select("status, started_at, target_minutes")
-        .lte("task_date", today)
-        .in("status", ["in_progress", "cleaned"]),
-      supabase
-        .from("maintenance_tickets")
-        .select("priority, due_at, assigned_to")
-        .in("status", ["open", "in_progress", "on_hold"]),
-      supabase.from("leave_requests").select("staff_id").eq("status", "pending").neq("staff_id", session.staff.id),
-    ]);
+  const [
+    tentative,
+    waitlisted,
+    arrivals,
+    departures,
+    inHouse,
+    occupied,
+    rooms,
+    unassigned,
+    openRequests,
+    hkOpen,
+    mtOpen,
+    leavePending,
+    tapeRooms,
+    tapeTypes,
+    tapeBookings,
+    tapeBlocks,
+  ] = await Promise.all([
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "tentative"),
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "waitlisted"),
+    supabase
+      .from("bookings")
+      .select("*, guests(id, full_name), rooms(id, room_number)")
+      .eq("check_in", today)
+      .in("status", ["tentative", "confirmed"])
+      .order("created_at"),
+    supabase
+      .from("bookings")
+      .select("*, guests(id, full_name), rooms(id, room_number)")
+      .eq("check_out", today)
+      .eq("status", "checked_in")
+      .order("created_at"),
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "checked_in"),
+    supabase
+      .from("bookings")
+      .select("rooms_count")
+      .lte("check_in", today)
+      .gt("check_out", today)
+      .in("status", OCCUPYING_STATUSES),
+    supabase.from("rooms").select("id, status, housekeeping_status"),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .is("room_id", null)
+      .lte("check_in", today)
+      .in("status", ["confirmed", "checked_in"]),
+    supabase.from("guest_requests").select("id", { count: "exact", head: true }).eq("status", "open"),
+    supabase
+      .from("housekeeping_tasks")
+      .select("status, started_at, target_minutes")
+      .lte("task_date", today)
+      .in("status", ["in_progress", "cleaned"]),
+    supabase
+      .from("maintenance_tickets")
+      .select("priority, due_at, assigned_to")
+      .in("status", ["open", "in_progress", "on_hold"]),
+    supabase.from("leave_requests").select("staff_id").eq("status", "pending").neq("staff_id", session.staff.id),
+    supabase.from("rooms").select("*").order("room_number"),
+    supabase.from("room_types").select("*").order("sort_order"),
+    supabase
+      .from("bookings")
+      .select("id, reference, contact_name, check_in, check_out, status, room_id, room_type_id, rooms_count, is_vip")
+      .in("status", ["tentative", "confirmed", "checked_in", "checked_out"])
+      .lt("check_in", tapeEnd)
+      .gt("check_out", tapeStart),
+    supabase.from("room_blocks").select("*").is("released_at", null).lt("start_date", tapeEnd),
+  ]);
 
   const arrivalList = (arrivals.data ?? []) as Booking[];
   const departureList = (departures.data ?? []) as Booking[];
@@ -228,6 +253,27 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <MovementList title="Arrivals" icon={<LogIn className="w-4 h-4 text-emerald-600" />} bookings={arrivalList} empty="No arrivals today." />
             <MovementList title="Departures" icon={<LogOut className="w-4 h-4 text-blue-600" />} bookings={departureList} empty="No departures today." />
           </div>
+
+          {(tapeRooms.data?.length ?? 0) > 0 && (
+            <Card className="mb-6 overflow-x-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-900">Tape chart</h2>
+                <Link href="/admin/tape-chart" className="text-sm text-yellow-800 hover:text-yellow-900">
+                  Full tape chart →
+                </Link>
+              </div>
+              <TapeChart
+                rooms={tapeRooms.data ?? []}
+                roomTypes={tapeTypes.data ?? []}
+                bookings={(tapeBookings.data ?? []) as unknown as Booking[]}
+                blocks={tapeBlocks.data ?? []}
+                start={tapeStart}
+                days={tapeDays}
+                today={today}
+                canCreate={canCreate}
+              />
+            </Card>
+          )}
         </>
       )}
 
